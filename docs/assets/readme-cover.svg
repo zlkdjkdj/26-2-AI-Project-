@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title description">
+  <title id="title">앗차차 — 사진 한 장. 더 안전한 하루.</title>
+  <desc id="description">AI 기반 취약계층 생활안전 관리 서비스. 사진 촬영에서 안전 피드백과 재점검까지 연결합니다.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f4f8ff"/><stop offset="1" stop-color="#e4eeff"/></linearGradient>
+    <linearGradient id="blue" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#2686fa"/><stop offset="1" stop-color="#075bca"/></linearGradient>
+  </defs>
+  <rect width="1200" height="400" rx="28" fill="url(#bg)"/>
+  <circle cx="1060" cy="80" r="220" fill="#fff" opacity=".45"/>
+  <circle cx="1190" cy="400" r="230" fill="#c9ddfa" opacity=".4"/>
+  <g font-family="Noto Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif">
+    <rect x="58" y="52" width="225" height="34" rx="17" fill="#dceaff"/>
+    <text x="77" y="75" font-size="15" font-weight="600" fill="#1e60af">AI · LIVING SPACE SAFETY</text>
+    <text x="58" y="156" font-size="64" font-weight="800" fill="#142238">앗차차<tspan fill="#1673e3">.</tspan></text>
+    <text x="60" y="216" font-size="30" font-weight="600" fill="#24344c">사진 한 장. 더 안전한 하루.</text>
+    <text x="61" y="259" font-size="18" fill="#536680">현재 공간을 유지하며, 필요한 변화부터.</text>
+    <g font-size="15" font-weight="600" fill="#3162a2">
+      <rect x="60" y="310" width="115" height="36" rx="18" fill="#fff"/>
+      <text x="81" y="334">사진 촬영</text>
+      <text x="185" y="334">→</text>
+      <rect x="211" y="310" width="135" height="36" rx="18" fill="#fff"/>
+      <text x="232" y="334">안전 피드백</text>
+      <text x="357" y="334">→</text>
+      <rect x="383" y="310" width="115" height="36" rx="18" fill="#fff"/>
+      <text x="413" y="334">재점검</text>
+    </g>
+  </g>
+  <g transform="translate(755 62)">
+    <rect x="0" y="0" width="345" height="270" rx="27" fill="#fff" opacity=".9"/>
+    <path d="M54 133 L172 37 L290 133 M82 111 V232 H263 V111" stroke="#ccdaed" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M173 79 L232 103 V157 C232 195 203 222 173 238 C143 222 114 195 114 157 V103 Z" fill="url(#blue)"/>
+    <path d="M143 155 L165 177 L205 132" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="300" cy="38" r="9" fill="#a2c5f7"/>
+    <circle cx="30" cy="231" r="6" fill="#a2c5f7"/>
+  </g>
+</svg>
