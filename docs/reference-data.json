@@ -1,0 +1,28 @@
+{
+  "purpose": "reference_library",
+  "source_url": "https://zenodo.org/records/18835199",
+  "license": "cc-by-4.0",
+  "class_names": [
+    "power socket",
+    "power strip",
+    "light switch"
+  ],
+  "indexed_images": 3668,
+  "image_bytes": 195699369,
+  "boxes_by_class": {
+    "light switch": 1417,
+    "power socket": 3377,
+    "power strip": 200
+  },
+  "source_split_counts": {
+    "test": 351,
+    "train": 2957,
+    "val": 360
+  },
+  "exact_duplicate_groups": 3,
+  "original_name_groups": 2069,
+  "skipped": [],
+  "storage_limit_bytes": 3000000000,
+  "notice": "Source labels are unreviewed references. Indexing performs no training or inference and does not create risk rules. A separate bounded crop classifier has its own evaluation report. Filename groups may include variants and naming collisions; source splits are not certified leakage-free.",
+  "all_reference_bytes": 378893598
+}

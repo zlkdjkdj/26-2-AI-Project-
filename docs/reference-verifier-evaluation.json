@@ -1,0 +1,115 @@
+{
+  "classes": [
+    "socket",
+    "power_strip",
+    "light_switch"
+  ],
+  "seed": 20261001,
+  "max_crops_per_class": 180,
+  "feature_pixels": [
+    64,
+    64
+  ],
+  "cpu_threads": 1,
+  "optimizer_steps": 250,
+  "source": "https://zenodo.org/records/18835199",
+  "license": "CC-BY-4.0",
+  "filename_group_overlap": 0,
+  "exact_image_overlap": 0,
+  "partition_counts": {
+    "train": 425,
+    "validation": 55,
+    "test": 60
+  },
+  "validation": {
+    "accuracy": 0.7818,
+    "macro_f1": 0.7822,
+    "classes": {
+      "socket": {
+        "precision": 0.8333,
+        "recall": 0.7143,
+        "support": 21,
+        "f1": 0.7692
+      },
+      "power_strip": {
+        "precision": 0.7222,
+        "recall": 0.8667,
+        "support": 15,
+        "f1": 0.7879
+      },
+      "light_switch": {
+        "precision": 0.7895,
+        "recall": 0.7895,
+        "support": 19,
+        "f1": 0.7895
+      }
+    },
+    "confusion": [
+      [
+        15,
+        3,
+        3
+      ],
+      [
+        1,
+        13,
+        1
+      ],
+      [
+        2,
+        2,
+        15
+      ]
+    ]
+  },
+  "test": {
+    "accuracy": 0.7667,
+    "macro_f1": 0.7669,
+    "classes": {
+      "socket": {
+        "precision": 0.7391,
+        "recall": 0.7727,
+        "support": 22,
+        "f1": 0.7556
+      },
+      "power_strip": {
+        "precision": 0.7619,
+        "recall": 0.8,
+        "support": 20,
+        "f1": 0.7805
+      },
+      "light_switch": {
+        "precision": 0.8125,
+        "recall": 0.7222,
+        "support": 18,
+        "f1": 0.7647
+      }
+    },
+    "confusion": [
+      [
+        17,
+        4,
+        1
+      ],
+      [
+        2,
+        16,
+        2
+      ],
+      [
+        4,
+        1,
+        13
+      ]
+    ]
+  },
+  "disagreement_threshold": 0.9,
+  "model_role": "uncertainty_only_no_bbox_or_risk_override",
+  "validation_strong_count": 23,
+  "validation_strong_accuracy": 0.9565,
+  "uncertainty_gate_passed": true,
+  "duration_seconds": 7.22,
+  "model_bytes": 12849,
+  "serving_enabled": true,
+  "notice": "Crop classification on grouped public labels, not detector precision/recall or home safety accuracy. Filename grouping may over-group unrelated images. No private photos were used in training. Domain-shift validation is still required."
+}
