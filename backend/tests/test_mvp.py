@@ -17,9 +17,15 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv('DETECTION_MODE', 'mock')
     monkeypatch.setenv('ELECTRICAL_DETECTION_ENABLED', 'false')
     monkeypatch.setenv('LLM_PROVIDER', 'openai')
+    monkeypatch.setenv('DEMO_ACCESS_CODE','test-private-presentation-code-2026')
+    monkeypatch.setenv('ANALYSIS_PER_MINUTE','100')
+    monkeypatch.setenv('ANALYSIS_PER_DAY','1000')
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.delenv('OPENAI_API_KEY', raising=False)
     with TestClient(main.app) as client:
+        unlocked=client.post('/api/demo/unlock',json={'code':'test-private-presentation-code-2026'})
+        assert unlocked.status_code==200,unlocked.text
+        client.headers['X-CSRF-Token']=unlocked.json()['csrf_token']
         yield client
 
 @pytest.fixture
@@ -374,7 +380,7 @@ def test_care_consent_auth_roles_and_stop(client):
     assert 'owner_token' not in body and 'guardian_token' not in body
     assert client.post('/api/care/stop',headers=owner).json()['enabled']==0
     assert client.post('/api/care/heartbeat',headers=owner,json={}).status_code==409
-    assert client.get('/api/care/guardian',headers=guardian).json()['state']=='paused'
+    assert client.get('/api/care/guardian',headers=guardian).status_code==401
 
 
 def test_care_inactivity_connection_loss_and_alert_dedup(client):
@@ -805,3 +811,23 @@ def test_shared_vision_matches_original_electrical_outputs(client,monkeypatch):
     assert optimized==original
     assert hasattr(electrical.load()[0],'request_scope')
     assert electrical.load()[0].cache is None
+
+def test_cached_photo_recomputes_target_specific_rules_and_scores(client,monkeypatch):
+    from app import analysis_service
+    analysis_service.clear_cache()
+    monkeypatch.setenv('DETECTION_MODE','yolo')
+    monkeypatch.setenv('DETECTION_CACHE_SECONDS','300')
+    detections=[{'object_type':'socket','object_label':'콘센트','confidence':.9,'bbox':[.1+.2*i,.2,.08,.1],'evidence':['visible_socket'],'evidence_source':'grounding_dino_image'} for i in range(3)]
+    calls=[]
+    def objects(content):calls.append(1);return detections
+    monkeypatch.setattr(main,'detect_image',objects)
+    monkeypatch.setattr(main,'detect_electrical',lambda content:[])
+    first=analyze(client,REAL_IMAGE.read_bytes(),target_type='elderly').json()
+    second=analyze(client,REAL_IMAGE.read_bytes(),target_type='toddler').json()
+    assert first['analysis_performance']['cache_hit'] is False
+    assert second['analysis_performance']['cache_hit'] is True
+    assert len(calls)==1
+    assert first['detected_objects']==second['detected_objects']
+    assert first['hazards'][0]['risk_level']!=second['hazards'][0]['risk_level']
+    assert first['safety_score']!=second['safety_score']
+    assert first['scan_id']!=second['scan_id']

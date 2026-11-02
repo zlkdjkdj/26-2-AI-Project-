@@ -1,0 +1,42 @@
+{
+  "cpu_comparison": [
+    {
+      "threads": 4,
+      "image": "power-strip.jpg",
+      "seconds": 21.358
+    },
+    {
+      "threads": 4,
+      "image": "indoor.jpg",
+      "seconds": 25.175
+    },
+    {
+      "threads": 6,
+      "image": "power-strip.jpg",
+      "seconds": 17.23,
+      "identical": true
+    },
+    {
+      "threads": 6,
+      "image": "indoor.jpg",
+      "seconds": 20.354,
+      "identical": true
+    }
+  ],
+  "detection_cache": {
+    "image": "power-strip.jpg",
+    "cold": {
+      "cache_hit": false,
+      "detection_seconds": 18.5965,
+      "wall_seconds": 18.5965
+    },
+    "repeat": {
+      "cache_hit": true,
+      "detection_seconds": 0.0037,
+      "wall_seconds": 0.0037
+    },
+    "outputs_identical": true,
+    "scope": "detector stage only; no external AI"
+  },
+  "scope": "Two public fixtures on a 6-core / 12-thread development PC; no external AI calls; not a general latency guarantee."
+}

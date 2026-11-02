@@ -1,7 +1,7 @@
 fastapi>=0.115,<1
 uvicorn[standard]>=0.34,<1
 python-multipart>=0.0.20,<1
-pillow>=11,<13
+pillow>=13,<14
 httpx>=0.28,<1
 python-dotenv>=1,<2
 pytest>=8,<10
@@ -14,3 +14,9 @@ tzdata>=2025.1; sys_platform == "win32"
 
 # Unchanged ONNX graph partitioning for shared image inference.
 onnx>=1.19,<2
+
+
+# Security floors for TLS roots and model-download transitive dependencies.
+certifi>=2026.10.18
+filelock>=4.2.1
+opentelemetry-api>=1.45.1

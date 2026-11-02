@@ -132,14 +132,14 @@ cd 26-2-AI-Project-
 
 python3 -m venv backend/.venv
 source backend/.venv/bin/activate
-pip install -r backend/requirements.txt
+pip install --require-hashes -r backend/requirements.lock
 cp -n backend/.env.example backend/.env
 
 python3 scripts/setup_model.py
 python3 scripts/setup_electrical_model.py
 ```
 
-모델은 별도 다운로드됩니다. 일반 모델 약 13MB, 전기설비 모델 약 204MB이며 설치 스크립트가 고정 버전·체크섬을 확인합니다. `requirements.lock.txt`는 검증 환경의 전체 버전 기록이고, 다른 Python 버전에서는 `requirements.txt`로 설치합니다.
+모델은 별도 다운로드됩니다. 일반 모델 약 13MB, 전기설비 모델 약 204MB이며 설치 스크립트가 고정 버전·체크섬을 확인합니다. Python 3.12 기준 `requirements.lock`을 해시 검증과 함께 설치합니다. `requirements.lock.txt`는 같은 파일을 참조하는 호환 진입점입니다. 의존성 변경은 `requirements.txt` 수정 후 lock을 재생성하고 보안 감사를 수행합니다.
 
 ### 2. 환경변수 설정
 
@@ -193,7 +193,7 @@ Windows에서는 `py -m venv backend/.venv`, `backend\.venv\Scripts\activate`, �
 ```bash
 # 터미널 1: 가상환경 활성화 후
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # 터미널 2
 cd frontend
@@ -349,7 +349,7 @@ python3 scripts/check_publication.py
 ```
 
 > [!WARNING]
-> 현재는 단일 사용자 **로컬 MVP**입니다. 일반 API 인증·기록 격리·저장 사진 접근 제어는 미구현이므로 개발 서버를 인터넷에 바로 공개하지 마세요. 소스 공개와 운영 서버 배포는 다릅니다. 자세한 내용은 [SECURITY.md](SECURITY.md)를 확인하세요.
+> 현재는 단일 사용자 **로컬 MVP**입니다. 현재는 회원가입 대신 시연 코드와 HttpOnly 세션으로 일반 API·분석·저장 사진 접근을 보호합니다. 다중 사용자 계정 격리를 제공하는 서비스는 아니므로 시연 코드를 공유하지 말고 기본 localhost 바인딩을 유지하세요. 소스 공개와 운영 서버 배포는 다릅니다. 자세한 내용은 [SECURITY.md](SECURITY.md)를 확인하세요.
 
 ## 개발 계획
 
@@ -423,3 +423,27 @@ Expo Go는 개발·테스트 도구이며 최종 APK와 다릅니다. 운영에�
 전기설비 모델의 같은 사진에 대한 시각 특징을 요청 내에서 공유하고 CPU 병렬 실행을 조정했습니다. 모델·질의·임계값·확대 재검증은 유지합니다. 분할된 ONNX는 최초 로딩 시 모델 폴더 아래 자동 생성하며 Git에 포함하지 않습니다. onnx 의존성을 설치해야 하며 분할 불가 시 원본 모델로 실행합니다. `ELECTRICAL_SHARED_VISION=false`로 원본 경로를 사용할 수 있습니다. [측정 결과](docs/analysis-performance.json)는 공개 사진 2장에 한정된 개발 측정입니다.
 
 웹은 완성된 위험 결과·점수·규칙 안내를 먼저 표시하고 추가 AI 설명을 나중에 갱신합니다. API 사용자는 multipart의 `defer_explanation=true`로 이 방식을 선택할 수 있으며 기본값은 기존 동기 방식입니다. `explanation_pending`이 true이면 GET `/api/scans/{id}`에서 완료된 추가 설명을 확인합니다. 서버가 중단되면 해당 추가 설명은 완료되지 않을 수 있지만 기존 분석 결과는 보존됩니다.
+
+
+## 개인 시연 잠금 및 최신 보안 설정
+
+회원가입·로그인 계정은 없습니다. 서버 최초 실행 시 `backend/data/demo-access-code.txt`에 무작위 시연 코드가 생성되며 입력한 브라우저만 8시간 동안 허용됩니다. 코드는 저장소·API 응답·브라우저 저장소에 넣지 않습니다. 대신 세션 토큰은 HttpOnly/SameSite 쿠키로, DB에는 토큰 해시만 저장합니다. 코드 입력·분석 요청은 서버에서 제한하며, 수정 요청에는 CSRF 토큰과 출처 검증을 적용합니다.
+
+- 개인 시연은 한 명의 소유자를 전제로 합니다. 시연 코드를 아는 사람은 동일한 소유자 권한으로 기록·사진을 볼 수 있으므로 공개하지 마세요. 일반 회원이나 별도의 마스터 계정은 없습니다.
+- 기본 코드는 위 로컬 파일에서 확인하세요. 선택적으로 비공개 서버 환경의 `DEMO_ACCESS_CODE`에 16자 이상의 충분히 무작위인 값을 설정할 수 있습니다. `.env.example`에는 값을 비워 둡니다.
+- 이 기기 잠그기/모든 기기 잠그기, 세션 만료, 코드 변경은 서버에서 검증합니다. 코드를 재발급하려면 서버 Python으로 `scripts/rotate_demo_code.py`를 실행하세요. 실제 코드는 출력하지 않습니다.
+- 기본 분석 한도는 분당 6회·하루 100회이며 계정 대신 동일한 시연 소유자 전체에 적용됩니다. 한 번에 하나의 이미지 분석만 허용하고 대기 중이면 429를 반환합니다. 추가 AI 설명은 최대 2개씩 처리하며 완성된 사진 결과를 먼저 표시합니다.
+- 업로드는 multipart 파싱 전 전체 요청 크기(파일 제한 8MB + 부가 입력 1MB)와 20초 수신 시간을 제한합니다. 이미지 디코더는 JPEG/PNG/WebP로 제한합니다.
+- 저장 기록은 이력에서 삭제할 수 있고, 기본 90일이 지난 점검/사진과 오래된 생활 확인 기록은 정리합니다. `DATA_RETENTION_DAYS`로 조정합니다. 백업은 별도로 관리해야 합니다.
+- 보호자 링크는 읽기 전용·생성 후 7일 유효이며 재발급/공유 철회/생활 확인 중지 시 기존 링크가 차단됩니다. 보호자 링크만으로 사진·분석에 접근할 수 없습니다.
+- 현재 Windows 보안 실행 환경은 `backend/.venv-secure`이며 잠금 파일과 일치하게 설치·검증했습니다. 재시작은 `cd backend` 후 `.venv-secure\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000`을 사용합니다. 프론트는 `cd frontend` 후 `npm run dev`입니다.
+- 외부 기기 테스트를 위해 LAN을 열 때에도 시연 코드가 필요합니다. 인터넷 공개 시에는 HTTPS와 `DEMO_COOKIE_SECURE=true`가 필요하며 프록시 출처·인증서·호스트를 별도로 검증해야 합니다. 이번 변경으로 인터넷에 서버를 공개하지 않습니다.
+
+## 추가 분석 최적화 및 리팩토링
+
+객체 탐지 실행과 추가 설명 작업을 `analysis_service.py`, 시연 잠금을 `demo_access.py`, 요청 제한을 `security.py`, 데이터 정리를 `data_retention.py`로 분리했습니다. 프론트는 `DemoAccess`가 접근 상태를 관리하고 `api.js`가 쿠키·CSRF와 오류를 일관되게 처리합니다. 사진 결과에서 사용하지 않는 기존 탭/비교 핸들러를 제거하고 관련 코드를 정리했습니다.
+
+- 동일하게 정규화된 사진의 객체 탐지 출력만 메모리에 최대 8개·기본 300초 동안 재사용합니다. 원본 이미지나 중간 이미지 특징을 요청 간 보관하지 않습니다. 대상자·공간별 규칙, 점수, 권고사항, 기록 저장은 매번 다시 실행합니다.
+- 모델 파일·임계값·전기설비/전선 확대 설정·보조 분류기가 바뀌면 캐시가 무효화됩니다. 만료·기기 잠금·기록 삭제 시 정리하며 `DETECTION_CACHE_SECONDS=0`으로 끌 수 있습니다.
+- 일반 가구와 전기설비 탐지를 병렬 수행하고, CPU 스레드는 자동으로 최대 6개까지만 사용합니다. 작은 시스템은 낮춰 설정하고 `ELECTRICAL_CPU_THREADS`로 1~6을 직접 지정할 수 있습니다.
+- 이 PC에서 공개 사진 2장의 전기설비 탐지는 CPU 4→6 변경 시 21.36→17.23초, 25.18→20.35초였으며 출력이 완전히 일치했습니다. 동일 사진 재요청의 탐지 단계는 18.60→0.0037초였습니다. 업로드·규칙·저장·외부 AI 시간은 포함하지 않으며 다른 사진/장비에 대한 지연 보장은 아닙니다.

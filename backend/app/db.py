@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from .config import DATABASE_PATH
 from .seed import seed_rules, seed_real_rules, seed_extra_rules, seed_electrical_rules
 
-SCHEMA = '''
+SCHEMA = """
 CREATE TABLE IF NOT EXISTS safety_tasks (
  scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
  task_key TEXT NOT NULL, data_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
@@ -78,13 +78,14 @@ CREATE TABLE IF NOT EXISTS interior_plans (
  scan_id INTEGER PRIMARY KEY REFERENCES scans(id) ON DELETE CASCADE,
  plan_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-'''
+"""
+
 
 @contextmanager
 def connect():
     connection = sqlite3.connect(DATABASE_PATH, timeout=15)
     connection.row_factory = sqlite3.Row
-    connection.execute('PRAGMA foreign_keys = ON')
+    connection.execute("PRAGMA foreign_keys = ON")
     try:
         yield connection
         connection.commit()
@@ -94,44 +95,62 @@ def connect():
     finally:
         connection.close()
 
+
 def migrate_nullable_score(connection):
-    columns = connection.execute('PRAGMA table_info(scans)').fetchall()
-    if not any(row['name'] == 'safety_score' and row['notnull'] for row in columns):
+    columns = connection.execute("PRAGMA table_info(scans)").fetchall()
+    if not any(row["name"] == "safety_score" and row["notnull"] for row in columns):
         return
     # Keep existing scans, IDs and dependent hazards while allowing 'not assessed'.
-    connection.execute('PRAGMA foreign_keys = OFF')
+    connection.execute("PRAGMA foreign_keys = OFF")
     try:
-        connection.execute('BEGIN IMMEDIATE')
-        create = SCHEMA[SCHEMA.index('CREATE TABLE IF NOT EXISTS scans ('):SCHEMA.index('CREATE TABLE IF NOT EXISTS hazards (')].strip().rstrip(';')
-        connection.execute(create.replace('IF NOT EXISTS scans', 'scans_migration'))
-        connection.execute('INSERT INTO scans_migration SELECT * FROM scans')
-        connection.execute('DROP TABLE scans')
-        connection.execute('ALTER TABLE scans_migration RENAME TO scans')
-        if connection.execute('PRAGMA foreign_key_check').fetchall():
-            raise sqlite3.IntegrityError('Migration failed foreign-key validation')
+        connection.execute("BEGIN IMMEDIATE")
+        create = (
+            SCHEMA[
+                SCHEMA.index("CREATE TABLE IF NOT EXISTS scans (") : SCHEMA.index(
+                    "CREATE TABLE IF NOT EXISTS hazards ("
+                )
+            ]
+            .strip()
+            .rstrip(";")
+        )
+        connection.execute(create.replace("IF NOT EXISTS scans", "scans_migration"))
+        names = ",".join(row["name"] for row in columns)
+        connection.execute(
+            f"INSERT INTO scans_migration ({names}) SELECT {names} FROM scans"
+        )
+        connection.execute("DROP TABLE scans")
+        connection.execute("ALTER TABLE scans_migration RENAME TO scans")
+        if connection.execute("PRAGMA foreign_key_check").fetchall():
+            raise sqlite3.IntegrityError("Migration failed foreign-key validation")
         connection.commit()
     except Exception:
         connection.rollback()
         raise
     finally:
-        connection.execute('PRAGMA foreign_keys = ON')
+        connection.execute("PRAGMA foreign_keys = ON")
 
 
 def init_db():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as connection:
         connection.executescript(SCHEMA)
-        connection.execute('''CREATE TABLE IF NOT EXISTS furniture_links (
+        connection.execute("""CREATE TABLE IF NOT EXISTS furniture_links (
           previous_scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
           current_scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
           previous_object_id TEXT NOT NULL, current_object_id TEXT NOT NULL,
           PRIMARY KEY(previous_scan_id,current_scan_id,current_object_id),
-          UNIQUE(previous_scan_id,current_scan_id,previous_object_id))''')
+          UNIQUE(previous_scan_id,current_scan_id,previous_object_id))""")
         migrate_nullable_score(connection)
-        connection.execute("INSERT OR IGNORE INTO users(id, email, name) VALUES (1, 'demo@localhost', '데모 사용자')")
+        connection.execute(
+            "INSERT OR IGNORE INTO users(id, email, name) VALUES (1, 'demo@localhost', '데모 사용자')"
+        )
+        from .demo_access import migrate
+
+        migrate(connection)
         seed_rules(connection)
         seed_real_rules(connection)
         seed_extra_rules(connection)
         seed_electrical_rules(connection)
         from .safety_catalog import seed_safety_rules
+
         seed_safety_rules(connection)

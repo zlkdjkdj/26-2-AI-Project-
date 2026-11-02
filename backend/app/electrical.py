@@ -36,7 +36,8 @@ def load():
     root=directory();model=root/'model_quantized.onnx';tokenizer=root/'tokenizer.json'
     if not model.is_file() or not tokenizer.is_file():
         raise ElectricalUnavailable('전선·전기설비 모델이 없습니다. scripts/setup_electrical_model.py를 실행하세요.')
-    threads=int(os.getenv('ELECTRICAL_CPU_THREADS',str(min(4, max(1, (os.cpu_count() or 2)//2)))))
+    try:threads=int((os.getenv('ELECTRICAL_CPU_THREADS') or str(min(6,max(1,(os.cpu_count() or 2)//2)))))
+    except ValueError as exc:raise ElectricalUnavailable('전기설비 CPU 스레드 설정이 올바르지 않습니다.') from exc
     shared=os.getenv('ELECTRICAL_SHARED_VISION','true').lower() in ('true','1','yes')
     identity=(str(root),model.stat().st_mtime_ns,tokenizer.stat().st_mtime_ns,threads,shared)
     if identity==_CACHE_ID and _CACHE is not None:
@@ -44,8 +45,8 @@ def load():
     with LOCK:
         if identity!=_CACHE_ID:
             try:
-                if not 1<=threads<=4:
-                    raise ValueError('Electrical CPU threads must be between 1 and 4')
+                if not 1<=threads<=6:
+                    raise ValueError('Electrical CPU threads must be between 1 and 6')
                 options=ort.SessionOptions();options.intra_op_num_threads=threads;options.inter_op_num_threads=1;options.log_severity_level=3
                 from .shared_vision import make_session
                 session=make_session(model,options) if shared else ort.InferenceSession(str(model),sess_options=options,providers=['CPUExecutionProvider'])

@@ -103,3 +103,6 @@ Thumbs.db
 
 # Local performance experiments; generated ONNX graphs stay out of source control.
 /work/
+
+# Clean Windows environment for the secured demonstration runtime.
+.venv-secure/

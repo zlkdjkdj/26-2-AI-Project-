@@ -13,7 +13,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent.parent
 RUNTIME = ROOT / '.run'
 SERVICES = {
-    'backend': {'cwd': ROOT / 'backend', 'command': [str(ROOT / 'backend/.venv/bin/python'), '-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000'], 'url': 'http://localhost:8000/api/health'},
+    'backend': {'cwd': ROOT / 'backend', 'command': [str(ROOT / 'backend/.venv/bin/python'), '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'], 'url': 'http://localhost:8000/api/health'},
     'frontend': {'cwd': ROOT / 'frontend', 'command': ['npm', 'run', 'dev'], 'url': 'http://localhost:5173'},
 }
 
