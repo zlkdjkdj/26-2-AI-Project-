@@ -100,3 +100,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Local performance experiments; generated ONNX graphs stay out of source control.
+/work/

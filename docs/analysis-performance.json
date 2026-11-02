@@ -1,0 +1,23 @@
+{
+  "scope": "Electrical detector only; two public fixtures normalized by the upload pipeline; includes model loading. CPU 6 physical / 12 logical. Not a general latency or accuracy guarantee. No external AI calls.",
+  "baseline": "Original graph, 2 CPU threads",
+  "optimized": "Identical graph partitioned at visual/text boundary, request-local visual reuse, 4 CPU threads",
+  "cases": [
+    {
+      "image": "power-strip.jpg",
+      "before_seconds": 33.704214900004445,
+      "after_seconds": 23.82115229999181,
+      "identical": true,
+      "detections": 2,
+      "reduction_percent": 29.3
+    },
+    {
+      "image": "indoor.jpg",
+      "before_seconds": 42.49355120002292,
+      "after_seconds": 25.65305769999395,
+      "identical": true,
+      "detections": 1,
+      "reduction_percent": 39.6
+    }
+  ]
+}
