@@ -29,8 +29,14 @@ class SpaceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     space_type: SpaceType
 
+class FurnitureMatch(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    previous_object_id: str=Field(pattern=r'^object-\d+$')
+    current_object_id: str=Field(pattern=r'^object-\d+$')
+
 class CompareRequest(BaseModel):
     previous_scan_id: int = Field(gt=0)
+    confirmed_matches: list[FurnitureMatch] | None=Field(default=None,max_length=40)
 
 class ResolutionRequest(BaseModel):
     resolved: bool

@@ -1,0 +1,6 @@
+{
+  "scope": "One public close-up photograph; two visible cable segments manually boxed for a development regression. Not a representative accuracy benchmark.",
+  "cases": [
+    {"image": "power-strip.jpg", "wire_boxes": [[0.0, 0.17, 0.18, 0.15], [0.84, 0.70, 0.16, 0.18]]}
+  ]
+}

@@ -63,4 +63,5 @@ def evaluate(detections: list[dict], target_type: str, space_type: str) -> list[
                     'recommendation_priority': ['정리·재배치', '안전용품 보완'],
                     'resolved': False,
                 })
-    return hazards
+    from .contextual_advice import personalize
+    return personalize(hazards, detections, target_type, space_type)

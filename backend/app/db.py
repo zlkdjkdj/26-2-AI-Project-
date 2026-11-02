@@ -4,6 +4,17 @@ from .config import DATABASE_PATH
 from .seed import seed_rules, seed_real_rules, seed_extra_rules, seed_electrical_rules
 
 SCHEMA = '''
+CREATE TABLE IF NOT EXISTS safety_tasks (
+ scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+ task_key TEXT NOT NULL, data_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL, PRIMARY KEY(scan_id,task_key)
+);
+CREATE TABLE IF NOT EXISTS safety_events (
+ id INTEGER PRIMARY KEY, scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+ task_key TEXT NOT NULL, snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_safety_events ON safety_events(scan_id,id);
+
 CREATE TABLE IF NOT EXISTS users (
  id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -110,6 +121,12 @@ def init_db():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as connection:
         connection.executescript(SCHEMA)
+        connection.execute('''CREATE TABLE IF NOT EXISTS furniture_links (
+          previous_scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+          current_scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+          previous_object_id TEXT NOT NULL, current_object_id TEXT NOT NULL,
+          PRIMARY KEY(previous_scan_id,current_scan_id,current_object_id),
+          UNIQUE(previous_scan_id,current_scan_id,previous_object_id))''')
         migrate_nullable_score(connection)
         connection.execute("INSERT OR IGNORE INTO users(id, email, name) VALUES (1, 'demo@localhost', '데모 사용자')")
         seed_rules(connection)

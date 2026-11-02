@@ -33,7 +33,9 @@ def load_model():
         identity = (str(path), path.stat().st_mtime_ns)
         if _NET is None or _NET_PATH != identity:
             try:
-                _NET = cv2.dnn.readNetFromONNX(str(path))
+                # OpenCV's Windows file loader cannot reliably open Korean paths.
+                # Python reads the file using Unicode paths; OpenCV parses the bytes.
+                _NET = cv2.dnn.readNetFromONNX(np.frombuffer(path.read_bytes(), dtype=np.uint8))
                 _NET_PATH = identity
             except cv2.error as exc:
                 _NET = None

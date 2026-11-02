@@ -30,6 +30,8 @@ def available_checks(target_type, space_type):
 
 
 def enrich(scan):
+    from .contextual_advice import personalize
+    personalize(scan['hazards'], scan.get('detected_objects', []), scan['target_type'], scan['space_type'])
     with connect() as connection:
         states = {row['object_type']:dict(row) for row in connection.execute('SELECT * FROM scan_checks WHERE scan_id=?',(scan['scan_id'],))}
         tasks = {row['task_key']:bool(row['completed']) for row in connection.execute('SELECT * FROM guide_tasks WHERE scan_id=?',(scan['scan_id'],))}
@@ -46,6 +48,8 @@ def enrich(scan):
     confirmed = [c for c in checks if c['status'] == 'risk']
     for check in checks:check['source_url']=SOURCE_BY_OBJECT.get(check['key'],SOURCES[0]['url'] if scan['target_type']=='elderly' else SOURCES[1]['url'])
     scan.setdefault('scoring',{'version':'v1','notice':'이 기록은 이전 기준(15·7·3점 차감)으로 계산되었습니다. 새로운 기준은 다시 촬영한 점검부터 적용됩니다.'})
+    from .surface_safety import focus_checks
+    scan['surface_safety'] = focus_checks(scan)
     scan['field_checks'] = checks
     scan['field_check_summary'] = {
         'total':len(checks), 'checked':sum(c['status'] != 'unknown' for c in checks),
@@ -58,18 +62,23 @@ def enrich(scan):
     guide = []
     seen = set()
     for hazard in items:
-        key = f"photo:{hazard['object']}:{hazard['condition']}"
+        legacy_key = f"photo:{hazard['object']}:{hazard['condition']}"
+        key = f"{legacy_key}:{hazard['id']}"
         if key in seen:
             continue
         seen.add(key)
-        guide.append({'key':key,'title':f"{hazard['object_label']} 위치 확인", 'first':hazard['recommendation'],
+        unique_group = sum(h['object']==hazard['object'] and h['condition']==hazard['condition'] for h in items)==1
+        completed = tasks.get(key, tasks.get(legacy_key, False) if unique_group else False)
+        guide.append({'key':key,'title':f"{hazard.get('instance_label',hazard['object_label'])} 확인", 'first':hazard['recommendation'],
                       'supplement':hazard['supplement'], 'source':'photo', 'risk_level':hazard['risk_level'],
-                      'bbox':hazard['bbox'], 'completed':tasks.get(key,False), 'hazard_id':hazard['id']})
+                      'bbox':hazard['bbox'], 'completed':completed, 'hazard_id':hazard['id']})
     for check in sorted(confirmed, key=lambda c:priorities[c['risk_level']]):
         key = f"check:{check['key']}"
         guide.append({'key':key,'title':f"{check['label']} 개선",'first':check['recommendation'],'supplement':check['supplement'],
                       'source':'user_confirmation','risk_level':check['risk_level'],'bbox':None,'completed':tasks.get(key,False)})
     guide.sort(key=lambda step:priorities[step['risk_level']])
+    from .action_options import options
+    for step in guide:step['options']=options(step)
     path, principle = ROOM_GUIDES[scan['space_type']]
     scan['interior_guide'] = {
         'title':f"{SPACE_LABELS[scan['space_type']]}, 더 편안하게", 'target_label':TARGET_LABELS[scan['target_type']],

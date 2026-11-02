@@ -1,0 +1,9 @@
+import { useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import { filterActions } from './planner';
+
+export default function ImprovementPlanner({guide,busy,onToggle}){
+  const [budget,setBudget]=useState('all'),[effort,setEffort]=useState('all');
+  const steps=filterActions(guide.steps,budget,effort);
+  return <section className="improvement-planner"><div className="panel-heading"><span className="eyebrow">실천할 수 있는 변화부터</span><h2>예산과 작업량에 맞춰 고르세요.</h2><p>필터는 개선 방법만 분류합니다. 위험 항목이나 점수는 바뀌지 않아요. 실제 비용은 제품·설치 조건에 따라 달라요.</p></div><div className="planner-filters"><label>예산 방향<select value={budget} onChange={e=>setBudget(e.target.value)}><option value="all">전체 예산</option><option value="no_purchase">새 구매 없이 확인·정리</option><option value="accessories">보완용품 구매 검토</option><option value="professional">설치·교체 견적 확인</option></select></label><label>작업량<select value={effort} onChange={e=>setEffort(e.target.value)}><option value="all">전체 작업량</option><option value="quick">간단한 확인·정리</option><option value="moderate">보완 작업</option><option value="assistance">도움·설치 조건 확인</option></select></label></div><p className="panel-note">전체 {guide.steps.length}개 점검 항목 중 조건에 맞는 {steps.length}개 항목의 방법을 표시합니다.</p><div className="planner-grid">{steps.map(step=><article className="guide-card" key={step.key}><h3>{step.title}</h3><small>{step.source==='photo'?'사진 기반 확인 항목':'직접 확인한 위험'} · {step.risk_level==='HIGH'?'고위험':step.risk_level==='MEDIUM'?'중위험':'저위험'}</small>{step.visibleOptions.map(option=><div key={option.kind} className="action-option"><span>{option.budget_label} · {option.effort_label}</span><p>{option.action}</p></div>)}<button className={`completion-button ${step.completed?'done':''}`} disabled={busy} onClick={()=>onToggle(step)}><CheckCircle2 size={16}/>{step.completed?'실천 완료 · 취소':'이 항목을 실천했어요'}</button></article>)}</div>{!steps.length&&<p className="empty-filter">선택한 두 조건에 맞는 개선 방법이 없어요. 예산 또는 작업량 필터를 바꿔보세요.</p>}</section>;
+}

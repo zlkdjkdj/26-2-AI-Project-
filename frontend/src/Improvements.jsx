@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, CheckCircle2, ChevronRight, LayoutTemplate, ListChecks, MoveRight, ShieldCheck } from 'lucide-react';
 import InteriorStudio from './InteriorStudio';
+import ImprovementPlanner from './ImprovementPlanner';
 
 const levelNames = { HIGH: '고위험', MEDIUM: '중위험', LOW: '저위험' };
 
@@ -9,17 +10,13 @@ export function InteriorGuide({ result, image, file, busy, onToggle, onPhoto }) 
   if (!guide) return null;
   return <section className="improvement-panel">
     <InteriorStudio key={result.scan_id} result={result} image={image} file={file}/>
+    <ImprovementPlanner guide={guide} busy={busy} onToggle={onToggle}/>
     <details className="studio-safety"><summary>안전 개선 체크리스트와 상세 가이드</summary><div>
     <div className="panel-heading"><span className="eyebrow">현재 환경을 최대한 유지해요</span><h2>{guide.title}</h2><p>새 가구보다, 지금 공간의 작은 변화부터.</p></div>
     <div className="room-principle"><LayoutTemplate size={23}/><div><strong>{guide.path}</strong><p>{guide.principle}</p><small>{guide.target_tip}<br/>{guide.measurement_tip}</small></div></div>
     <div className="guide-order"><span>1 정리</span><ChevronRight size={15}/><span>2 재배치</span><ChevronRight size={15}/><span>3 보완</span></div>
     {image && <div className="guide-photo"><img src={image} alt="재배치 전에 위치를 확인할 공간"/>{guide.steps.map((step,index) => step.bbox && <button key={step.key} className="guide-pin" style={{left:`${(step.bbox[0]+step.bbox[2]/2)*100}%`,top:`${(step.bbox[1]+step.bbox[3]/2)*100}%`}} aria-label={`${step.title} 사진 피드백 열기`} onClick={()=>onPhoto(step.hazard_id)}>{index+1}</button>)}</div>}
     <div className="guide-progress"><span>{guide.completed} / {guide.steps.length}개 실천</span><progress value={guide.completed} max={Math.max(1,guide.steps.length)}/></div>
-    {guide.steps.length ? guide.steps.map((step,index)=><article className={`guide-card ${step.completed?'completed':''}`} key={step.key}>
-      <div className="guide-card-title"><span className="guide-index">{step.completed?<Check size={16}/>:index+1}</span><div><h3>{step.title}</h3><small>{step.source==='photo'?'사진 기반 확인 항목':'직접 확인한 위험'}</small></div><span className={`risk-label ${step.risk_level}`}>{levelNames[step.risk_level]}</span></div>
-      <div className="guide-advice"><MoveRight size={17}/><p>{step.first}</p></div><p className="guide-supplement">보완이 필요하면 · {step.supplement}</p>
-      <button className={`completion-button ${step.completed?'done':''}`} disabled={busy} onClick={()=>onToggle(step)}><CheckCircle2 size={16}/>{step.completed?'실천 완료 · 취소':'이 가이드를 실천했어요'}</button>
-    </article>) : <div className="guide-card"><h3>현장에서 확인할 항목부터 살펴보세요</h3><p>직접 점검에서 위험이 있다고 확인한 항목도 이 가이드에 추가됩니다.</p></div>}
     <p className="panel-note">{guide.notice}</p>
     <details className="extra-settings"><summary>가이드 참고 자료</summary><div className="extra-content">{guide.sources.map(source=><p key={source.url}><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></p>)}</div></details>
     </div></details>

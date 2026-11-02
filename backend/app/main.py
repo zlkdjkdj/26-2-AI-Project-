@@ -8,7 +8,7 @@ import uuid
 import warnings
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -53,6 +53,8 @@ async def lifespan(app):
 
 app = FastAPI(title='앗차차 생활안전 MVP', version='0.2.0', lifespan=lifespan)
 app.include_router(care_router)
+from .safety_management import router as safety_router
+app.include_router(safety_router)
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_credentials=False, allow_methods=['GET', 'POST', 'PATCH'], allow_headers=['Content-Type','Authorization'])
 app.mount('/uploads', StaticFiles(directory=UPLOAD_DIR), name='uploads')
 
@@ -73,6 +75,20 @@ def health():
 @app.get('/api/options')
 def options():
     return {'targets': TARGET_LABELS, 'spaces': SPACE_LABELS, **detector_status(), 'explanation': provider_status(), 'electrical_detection': electrical_status()}
+
+@app.get('/api/interior/style-status')
+def style_status():
+    from .style_analysis import status
+    return status()
+
+@app.post('/api/interior/analyze-style')
+async def analyze_style(file:Annotated[UploadFile,File()]):
+    from .style_analysis import analyze
+    content=await file.read(MAX_UPLOAD_BYTES+1);await file.close()
+    if not content:raise HTTPException(400,'참고 인테리어 사진을 선택하세요.')
+    if len(content)>MAX_UPLOAD_BYTES:raise HTTPException(413,'참고 사진은 8MB 이하로 선택하세요.')
+    _,_,normalized=await run_in_threadpool(validate_image,content)
+    return await run_in_threadpool(analyze,normalized)
 
 @app.get('/api/targets')
 def list_targets():
@@ -103,6 +119,11 @@ def get_scan(scan_id: int):
             raise HTTPException(404, '점검 기록을 찾을 수 없습니다.')
         result = json.loads(row['result_json'])
         result.update(scan_id=row['id'], created_at=row['created_at'])
+        if result.get('explanation_pending'):
+            from datetime import datetime, timezone
+            if (datetime.now(timezone.utc)-datetime.fromisoformat(row['created_at'].replace('Z','+00:00'))).total_seconds()>120:
+                result['explanation_pending']=False
+                result['explanation']['notice']='추가 AI 설명이 지연되거나 중단되었습니다. 위험요소별 권고사항과 점수는 확인할 수 있습니다.'
         states = {r['hazard_id']: bool(r['resolved']) for r in connection.execute('SELECT r.hazard_id,r.resolved FROM recommendations r JOIN hazards h ON h.id=r.hazard_id WHERE h.scan_id=?', (scan_id,))}
         for hazard in result['hazards']:
             hazard['resolved'] = states.get(hazard['id'], False)
@@ -185,7 +206,10 @@ def compare(scan_id: int, payload: CompareRequest):
     new_checks = {c['key'] for c in current['field_checks'] if c['status'] == 'risk'}
     old = {(h['object'], h['condition']) for h in previous['hazards']}
     new = {(h['object'], h['condition']) for h in current['hazards']}
+    from .furniture_tracking import track
+    furniture_tracking=track(previous,current,payload.confirmed_matches)
     return {'previous_scan_id': payload.previous_scan_id, 'current_scan_id': scan_id,
+            'furniture_tracking':furniture_tracking,
             'field_check_comparison': {'before_confirmed':len(old_checks),'after_confirmed':len(new_checks),
               'removed':sorted(old_checks-new_checks),'added':sorted(new_checks-old_checks),
               'notice':'직접 점검 항목은 각 촬영 기록에서 다시 확인해야 합니다. 미확인은 개선 완료가 아닙니다.'},
@@ -230,15 +254,33 @@ def persist_result(result: dict, target_id: int | None, space_id: int | None):
         connection.execute('UPDATE scans SET result_json=? WHERE id=?', (json.dumps(result, ensure_ascii=False), scan_id))
     return get_scan(scan_id)
 
+async def finish_explanation(scan_id, hazards, target_type, space_type, detection_mode):
+    try:
+        explanation = await explain(hazards, target_type, space_type, detection_mode)
+    except Exception:
+        logger.warning('Additional explanation failed; preserving rule feedback.')
+        explanation = {'mode':'rule_template','summary':'기존 위험요소별 권고사항을 확인하세요.','notice':'추가 AI 설명을 완료하지 못했습니다. 위험요소별 안내와 점수는 유지됩니다.'}
+    def save():
+        with connect() as connection:
+            connection.execute('BEGIN IMMEDIATE')
+            row=connection.execute('SELECT result_json FROM scans WHERE id=?',(scan_id,)).fetchone()
+            if row is None:return
+            stored=json.loads(row[0]);stored.update(explanation=explanation,explanation_pending=False)
+            connection.execute('UPDATE scans SET result_json=? WHERE id=?',(json.dumps(stored,ensure_ascii=False),scan_id))
+    try: await run_in_threadpool(save)
+    except sqlite3.Error: logger.warning('Additional explanation could not be saved.')
+
 @app.post('/api/analyze/image', status_code=201)
 @app.post('/api/scans', status_code=201)
 async def analyze_image(
+    background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File()],
     target_type: Annotated[TargetType, Form()],
     space_type: Annotated[SpaceType | Literal['auto'], Form()],
     space_name: Annotated[str, Form(min_length=1, max_length=80)] = '우리집',
     scenario: Annotated[Literal['baseline', 'improved'], Form()] = 'baseline',
     save_image: Annotated[bool, Form()] = False,
+    defer_explanation: Annotated[bool, Form()] = False,
     target_id: Annotated[int | None, Form(gt=0)] = None,
     space_id: Annotated[int | None, Form(gt=0)] = None,
 ):
@@ -286,7 +328,9 @@ async def analyze_image(
                     space_name = row['name']
     hazards = evaluate(detections, target_type, space_type)
     hazards.sort(key=lambda h: {'HIGH':0, 'MEDIUM':1, 'LOW':2}[h['risk_level']])
-    explanation = await explain(hazards, target_type, space_type, detection_mode)
+    pending = defer_explanation and provider_status()['configured']
+    explanation = await explain(hazards, target_type, space_type, detection_mode, rules_only=True) if pending else await explain(hazards, target_type, space_type, detection_mode)
+    if pending: explanation['notice']='위험규칙 기반 안내입니다. 추가 AI 설명은 준비되는 대로 표시합니다.'
     image_url = None
     stored_path = None
     if save_image:
@@ -302,10 +346,12 @@ async def analyze_image(
               'image_width': width, 'image_height': height, 'bbox_format': 'normalized_xywh',
               'safety_score': safety_score(hazards) if hazards else None, 'scoring':score_policy(), 'hazards': hazards,
               'counts': {level: sum(h['risk_level'] == level for h in hazards) for level in ('HIGH', 'MEDIUM', 'LOW')},
-              'explanation': explanation,
+              'explanation': explanation, 'explanation_pending': pending,
               'notice': ('Mock 모드: 사진 내용은 인식하지 않습니다. 위치·조건·점수는 예시입니다.' if detection_mode == 'mock' else '일반 객체와 전선·콘센트·멀티탭을 로컬 탐지 모델로 분석합니다. 점수는 사진 확인 항목·DB 규칙에 한정한 참고값입니다. 물기·손상·과부하·실제 높이·통로 폭은 사진으로 확정할 수 없습니다. 탐지되지 않은 항목도 직접 확인하세요.')}
     try:
-        return await run_in_threadpool(persist_result, result, target_id, space_id)
+        saved = await run_in_threadpool(persist_result, result, target_id, space_id)
+        if pending: background_tasks.add_task(finish_explanation, saved['scan_id'], hazards, target_type, space_type, detection_mode)
+        return saved
     except Exception:
         if stored_path is not None:
             stored_path.unlink(missing_ok=True)

@@ -13,7 +13,7 @@ def provider_status():
     return {'provider':selected, 'configured':bool(os.getenv(variable, '').strip()),
             'model':os.getenv('GEMINI_MODEL', 'gemini-3.1-flash-lite') if selected == 'gemini' else os.getenv('OPENAI_MODEL','gpt-4.1-mini')}
 
-async def explain(hazards: list[dict], target_type: str, space_type: str, detection_mode='mock') -> dict:
+async def explain(hazards: list[dict], target_type: str, space_type: str, detection_mode='mock', rules_only=False) -> dict:
     is_mock = detection_mode == 'mock'
     count = len(hazards)
     if not count:
@@ -26,7 +26,7 @@ async def explain(hazards: list[dict], target_type: str, space_type: str, detect
     provider = status['provider']
     key = os.getenv('GEMINI_API_KEY' if provider == 'gemini' else 'OPENAI_API_KEY', '').strip()
     fallback_response = {'mode':'rule_template', 'summary':fallback, 'notice':'설명 API 키가 없어 위험 DB 기반 안내를 제공합니다.'}
-    if not key:
+    if rules_only or not key:
         return fallback_response
     facts = [{k:h[k] for k in ('object_label','risk_level','description','accident','recommendation','supplement')} for h in hazards]
     instructions = ('한국어로 생활안전 점검 결과를 4문장 이내로 안내하세요. 입력의 DB 위험 이유, 예상 사고, 개선방법만 사용하세요. '

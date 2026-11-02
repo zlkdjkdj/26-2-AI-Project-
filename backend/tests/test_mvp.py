@@ -433,8 +433,10 @@ def test_html_report_escapes_user_content(client,image):
 def test_electrical_real_power_strip_and_blank(client,image,monkeypatch):
     from app.electrical import detect
     monkeypatch.setenv('ELECTRICAL_DETECTION_ENABLED','true')
+    monkeypatch.setenv('ELECTRICAL_CABLE_REFINEMENT','true')
     detections=detect((REAL_IMAGE.parent/'power-strip.jpg').read_bytes())
     assert any(d['object_type']=='power_strip' for d in detections)
+    assert any(d['object_type']=='electric_wire' and d.get('refinement')=='cable_candidate' for d in detections)
     assert all(d['evidence_source']=='grounding_dino_image' for d in detections)
     assert not any('overloaded_power' in d['evidence'] for d in detections)
     for item in detections:
@@ -518,7 +520,7 @@ def test_interior_plan_stores_concept_and_validates_detected_furniture(client,im
     scan=analyze(client,image).json()
     url=f"/api/scans/{scan['scan_id']}/interior"
     plan=client.get(url).json()
-    assert len(plan['concepts'])==4 and plan['selected_concept'] is None
+    assert len(plan['concepts'])==8 and plan['selected_concept'] is None
     assert plan['furniture']==[] # Mock hazard items aren't actual detected furniture.
     assert client.patch(url,json={'concept':'natural','placements':[{'id':'unknown','x':.5,'y':.5}]}).status_code==422
     saved=client.patch(url,json={'concept':'natural','placements':[],'room_width':4.2,'room_depth':3.5})
@@ -527,6 +529,51 @@ def test_interior_plan_stores_concept_and_validates_detected_furniture(client,im
     assert client.get(f"/api/scans/{scan['scan_id']}").json()['safety_score']==scan['safety_score']
     assert client.patch(url,json={'concept':'unknown'}).status_code==422
     assert client.patch(url,json={'concept':'minimal','room_width':0}).status_code==422
+
+
+def test_existing_scan_gets_individual_furniture_guides_without_rescoring(client,image):
+    scan=analyze(client,image).json()
+    detections=[{'object_type':'chair','confidence':.8,'bbox':bbox,'evidence':['visible_furniture'],
+                 'evidence_source':'yolo_image_geometry'} for bbox in ([.05,.6,.15,.2],[.75,.1,.15,.2])]
+    hazards=evaluate(detections,'elderly','living_room')
+    for index,h in enumerate(hazards):h['id']=scan['hazards'][index]['id']
+    scan.update(detected_objects=detections,hazards=hazards,detection_mode='yolo')
+    with db.connect() as con:
+        con.execute('UPDATE scans SET result_json=? WHERE id=?',(json.dumps(scan),scan['scan_id']))
+    result=client.get(f"/api/scans/{scan['scan_id']}").json()
+    assert result['safety_score']==scan['safety_score']
+    steps=result['interior_guide']['steps']
+    assert len(steps)==2 and steps[0]['key']!=steps[1]['key']
+    assert steps[0]['title']!=steps[1]['title']
+    updated=client.patch(f"/api/scans/{scan['scan_id']}/guide-tasks",json={'key':steps[0]['key'],'completed':True})
+    assert updated.status_code==200,updated.text
+    steps=updated.json()['interior_guide']['steps']
+    assert sum(s['completed'] for s in steps)==1
+    plan=client.get(f"/api/scans/{scan['scan_id']}/interior").json()
+    assert len(plan['furniture'])==2 and len(plan['layout_options'])==2
+
+
+def test_custom_design_colors_furniture_and_placements_persist_without_changing_scan(client,image):
+    scan=analyze(client,image).json()
+    url=f"/api/scans/{scan['scan_id']}/interior"
+    payload={'concept':'natural','wall_color':'#d8e2dd','floor_color':'#987655','floor_pattern':'tile',
+             'custom_furniture':[{'id':'custom-demo','kind':'couch','label':'내 소파','width':.28,'depth':.13}],
+             'placements':[{'id':'custom-demo','x':.25,'y':.4,'rotation':90}]}
+    saved=client.patch(url,json=payload)
+    assert saved.status_code==200,saved.text
+    reopened=client.get(url).json()
+    assert (reopened['wall_color'],reopened['floor_color'],reopened['floor_pattern'])==('#d8e2dd','#987655','tile')
+    item=reopened['furniture'][0]
+    assert item['source']=='user_added' and item['source_bbox'] is None
+    assert (item['id'],item['label'],item['x'],item['y'],item['rotation'])==('custom-demo','내 소파',.25,.4,90)
+    fresh=client.get(f"/api/scans/{scan['scan_id']}").json()
+    assert fresh['safety_score']==scan['safety_score'] and fresh['detected_objects']==scan['detected_objects']
+    assert client.patch(url,json={**payload,'wall_color':'url(https://example.com)'}).status_code==422
+    assert client.patch(url,json={**payload,'floor_pattern':'unknown'}).status_code==422
+    assert client.patch(url,json={**payload,'custom_furniture':payload['custom_furniture']*2}).status_code==422
+    assert client.patch(url,json={**payload,'placements':[{'id':'object-999','x':.5,'y':.5}]}).status_code==422
+    assert client.patch(url,json={**payload,'custom_furniture':[{**payload['custom_furniture'][0],'id':'object-1'}]}).status_code==422
+    assert client.patch(url,json={'concept':'natural','placements':[]}).json()['furniture']==[]
 
 
 def test_interior_generation_consent_configuration_identity_and_response(client,image,monkeypatch):
@@ -576,3 +623,185 @@ def test_interior_provider_quota_failure_is_explicit(client,image,monkeypatch):
     response=client.post(url+'/preview',data={'consent':'true'})
     assert response.status_code==503 and '한도' in response.json()['detail']
     assert 'test-key' not in response.text
+
+
+def test_style_upload_and_spatial_plan_persistence(client,image):
+    response=client.post('/api/interior/analyze-style',files={'file':('blank.png',image,'image/png')})
+    assert response.status_code==200 and response.json()['status']=='insufficient_detail'
+    assert client.post('/api/interior/analyze-style',files={'file':('broken.png',b'not image','image/png')}).status_code==415
+    scan=analyze(client,image).json();url=f"/api/scans/{scan['scan_id']}/interior"
+    payload={'concept':'japandi','room_width':4,'room_depth':3,'custom_furniture':[{'id':'custom-a','kind':'chair','label':'의자','width':.1,'depth':.1}],
+        'placements':[{'id':'custom-a','x':.1,'y':.1}], 'furniture_measurements':[{'id':'custom-a','width_m':.6,'depth_m':.6,'fixed':True}],
+        'openings':[{'id':'door-1','label':'현관문','kind':'door','wall':'north','offset_m':0,'width_m':.9,'swing':'inward'}]}
+    saved=client.patch(url,json=payload);assert saved.status_code==200,saved.text
+    data=client.get(url).json();assert data['furniture'][0]['width']==.15 and data['measurement_status']['measured']==1
+    assert data['furniture'][0]['fixed'] and data['openings'][0]['label']=='현관문'
+    assert any('현관문' in warning for warning in data['warnings'])
+    assert client.get(f"/api/scans/{scan['scan_id']}").json()['safety_score']==scan['safety_score']
+    assert client.patch(url,json={**payload,'furniture_measurements':[{'id':'unknown','width_m':1,'depth_m':1}]}).status_code==422
+
+
+def test_furniture_identity_links_are_confirmed_persisted_and_one_to_one(client,image):
+    before=analyze(client,image).json();after=analyze(client,image,scenario='improved').json()
+    for scan,bbox in [(before,[.1,.3,.2,.2]),(after,[.6,.3,.2,.2])]:
+        scan['detected_objects']=[{'object_type':'chair','object_label':'의자','bbox':bbox}]
+        with db.connect() as con:con.execute('UPDATE scans SET result_json=? WHERE id=?',(json.dumps(scan),scan['scan_id']))
+    url=f"/api/scans/{after['scan_id']}/compare"
+    payload={'previous_scan_id':before['scan_id']}
+    candidate=client.post(url,json=payload).json()['furniture_tracking']
+    assert candidate['pairs'][0]['identity']=='candidate' and candidate['pairs'][0]['photo_position_changed']
+    pair={'previous_object_id':'object-0','current_object_id':'object-0'}
+    saved=client.post(url,json={**payload,'confirmed_matches':[pair]})
+    assert saved.status_code==200,saved.text
+    assert client.post(url,json=payload).json()['furniture_tracking']['confirmed_matches']==1
+    assert client.post(url,json={**payload,'confirmed_matches':[pair,pair]}).status_code==422
+    assert client.post(url,json={**payload,'confirmed_matches':[{**pair,'current_object_id':'object-999'}]}).status_code==422
+    assert client.post(url,json={**payload,'confirmed_matches':[]}).json()['furniture_tracking']['confirmed_matches']==0
+
+
+def test_improvement_actions_expose_budget_and_effort_without_changing_risks(client,image):
+    scan=analyze(client,image).json()
+    assert all(len(step['options'])==2 for step in scan['interior_guide']['steps'])
+    for step in scan['interior_guide']['steps']:
+        assert step['options'][0]['budget']=='no_purchase'
+        assert step['options'][0]['action']==step['first']
+    assert scan['safety_score']==33 and len(scan['hazards'])==4
+
+def test_safety_management_workflow_preserves_detection_and_score(client, image):
+    scan = analyze(client, image).json()
+    path = f"/api/scans/{scan['scan_id']}/safety"
+    initial = client.get(path).json()
+    assert len(initial['tasks']) == len(scan['hazards'])
+    task = initial['tasks'][0]
+    assert task['assessment'] == 'unknown' and task['version'] == 0
+    patch = dict(version=0, status='completed', assessment='risk', action='통로 전선을 벽 쪽으로 정리', note='정리함')
+    done = client.patch(path+'/'+task['key'], json=patch)
+    assert done.status_code == 200, done.text
+    patch.update(version=1, status='verified', confirm_recheck=True, note='현장에서 다시 확인함')
+    checked = client.patch(path+'/'+task['key'], json=patch).json()
+    assert next(t for t in checked['tasks'] if t['key']==task['key'])['status']=='verified'
+    assert len(checked['events']) == 2
+    assert checked['events'][0]['before'] == 'completed'
+    fetched = client.get(f"/api/scans/{scan['scan_id']}").json()
+    assert fetched['safety_score'] == scan['safety_score']
+    assert fetched['hazards'] == scan['hazards']
+    assert client.patch(path+'/'+task['key'], json=patch).status_code == 409
+
+
+def test_safety_management_rejects_unconfirmed_completion_and_invalid_scope(client, image):
+    scan = analyze(client, image).json()
+    other = analyze(client, image).json()
+    path = f"/api/scans/{scan['scan_id']}/safety"
+    task = client.get(path).json()['tasks'][0]
+    patch = dict(version=0, status='verified', assessment='risk', action='재배치', note='메모', confirm_recheck=True)
+    assert client.patch(path+'/'+task['key'], json=patch).status_code == 422
+    patch.update(status='completed', assessment='unknown')
+    assert client.patch(path+'/'+task['key'], json=patch).status_code == 422
+    patch.update(status='dismissed', assessment='clear', note='')
+    assert client.patch(path+'/'+task['key'], json=patch).status_code == 422
+    patch['note']='현장에서 통로와 무관한 전선임을 확인'
+    assert client.patch(path+'/'+task['key'], json=patch).status_code == 200
+    assert client.patch(f"/api/scans/{other['scan_id']}/safety/{task['key']}",json=patch).status_code==404
+    assert client.get('/api/scans/999999/safety').status_code==404
+
+
+def test_manual_safety_risk_due_dates_and_event_history(client, image):
+    scan = analyze(client, image).json()
+    path = f"/api/scans/{scan['scan_id']}/safety"
+    assert client.post(path,json={'title':' ','description':'test'}).status_code==422
+    response=client.post(path,json={'title':'들뜬 매트','description':'침실 입구 매트가 들뜸','risk_level':'HIGH'})
+    assert response.status_code==201,response.text
+    task=next(t for t in response.json()['tasks'] if t['source']=='manual')
+    patch=dict(version=1,status='planned',assessment='risk',action='매트 정리',assignee='본인',due_date='2000-01-01',note='통로 확인')
+    board=client.patch(path+'/'+task['key'],json=patch).json()
+    saved=next(t for t in board['tasks'] if t['key']==task['key'])
+    assert saved['overdue'] is True and saved['assignee']=='본인'
+    assert len(board['events'])==2
+    patch.update(version=2,status='completed')
+    done=client.patch(path+'/'+task['key'],json=patch).json()
+    assert next(t for t in done['tasks'] if t['key']==task['key'])['overdue']
+    patch.update(version=3,status='verified',confirm_recheck=True)
+    verified=client.patch(path+'/'+task['key'],json=patch).json()
+    assert not next(t for t in verified['tasks'] if t['key']==task['key'])['overdue']
+    assert verified['events'][-1]['status']=='observed'
+    assert client.get(f"/api/scans/{scan['scan_id']}").json()['safety_score']==scan['safety_score']
+    patch.update(version=4,due_date='nonsense')
+    assert client.patch(path+'/'+task['key'],json=patch).status_code==422
+
+
+def test_safety_recheck_requires_note_and_ack_and_can_be_reopened(client,image):
+    scan=analyze(client,image).json();path=f"/api/scans/{scan['scan_id']}/safety"
+    task=client.get(path).json()['tasks'][0]
+    payload=dict(version=0,status='completed',assessment='risk',action='정리')
+    assert client.patch(path+'/'+task['key'],json=payload).status_code==200
+    payload.update(version=1,status='verified',note='확인')
+    assert client.patch(path+'/'+task['key'],json=payload).status_code==422
+    payload.update(confirm_recheck=True,note='')
+    assert client.patch(path+'/'+task['key'],json=payload).status_code==422
+    payload['note']='다시 직접 확인'
+    assert client.patch(path+'/'+task['key'],json=payload).status_code==200
+    payload.update(version=2,status='observed',assessment='unknown',confirm_recheck=False,note='재발하여 다시 확인 필요')
+    board=client.patch(path+'/'+task['key'],json=payload).json()
+    assert next(t for t in board['tasks'] if t['key']==task['key'])['status']=='observed'
+    assert len(board['events'])==3
+
+def test_deferred_explanation_returns_rule_feedback_and_saves_full_summary(client,image,monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY','test-key-not-real')
+    async def success(self,url,**kwargs):
+        return httpx.Response(200,request=httpx.Request('POST',url),json={'status':'completed','output':[{'content':[{'type':'output_text','text':'추가 개선 설명입니다.'}]}]})
+    monkeypatch.setattr(httpx.AsyncClient,'post',success)
+    response=analyze(client,image,defer_explanation='true')
+    assert response.status_code==201,response.text
+    initial=response.json()
+    assert initial['explanation_pending'] is True
+    assert initial['explanation']['mode']=='rule_template'
+    assert initial['safety_score']==33 and initial['hazards'][0]['recommendation']
+    saved=client.get(f"/api/scans/{initial['scan_id']}").json()
+    assert saved['explanation_pending'] is False
+    assert saved['explanation']['summary']=='추가 개선 설명입니다.'
+    assert saved['hazards']==initial['hazards'] and saved['safety_score']==initial['safety_score']
+
+
+def test_deferred_explanation_failure_keeps_rule_recommendations(client,image,monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY','test-key-not-real')
+    async def fail(*args,**kwargs):raise httpx.ConnectError('offline')
+    monkeypatch.setattr(httpx.AsyncClient,'post',fail)
+    initial=analyze(client,image,defer_explanation='true').json()
+    saved=client.get(f"/api/scans/{initial['scan_id']}").json()
+    assert saved['explanation_pending'] is False and saved['explanation']['mode']=='rule_template'
+    assert saved['hazards']==initial['hazards']
+
+
+def test_surface_safety_is_conditional_and_does_not_add_photo_risks(client,image):
+    scan=analyze(client,image).json()
+    focus=scan['surface_safety']
+    assert '마찰력' in focus['notice']
+    assert len(scan['hazards'])==4 and scan['safety_score']==33
+    from app.surface_safety import focus_checks
+    base={'target_type':'toddler','space_type':'living_room','detected_objects':[{'object_type':'dining_table','bbox':[.1,.2,.3,.4]}],'hazards':[]}
+    result=focus_checks(base)
+    assert len(result['edges'])==1 and result['edges'][0]['hazard_id'] is None
+    assert '상판' in result['edges'][0]['area'] and any('머리' in q for q in result['edges'][0]['questions'])
+    base.update(target_type='newborn',space_type='bathroom')
+    result=focus_checks(base)
+    assert any('범퍼' in q for q in result['edges'][0]['questions'])
+    assert '샤워' in result['slip']['area']
+    base.update(space_type='stairs',detected_objects=[])
+    result=focus_checks(base)
+    assert result['edges']==[] and any('느슨한 매트' in a for a in result['slip']['actions'])
+
+
+def test_shared_vision_matches_original_electrical_outputs(client,monkeypatch):
+    from app import electrical
+    from app.main import validate_image
+    monkeypatch.setenv('ELECTRICAL_DETECTION_ENABLED','true')
+    monkeypatch.setenv('ELECTRICAL_CABLE_REFINEMENT','true')
+    monkeypatch.setenv('ELECTRICAL_CPU_THREADS','4')
+    _,_,photo=validate_image((REAL_IMAGE.parent/'power-strip.jpg').read_bytes())
+    monkeypatch.setenv('ELECTRICAL_SHARED_VISION','false')
+    original=electrical.detect(photo)
+    monkeypatch.setenv('ELECTRICAL_SHARED_VISION','true')
+    optimized=electrical.detect(photo)
+    assert optimized==original
+    assert hasattr(electrical.load()[0],'request_scope')
+    assert electrical.load()[0].cache is None

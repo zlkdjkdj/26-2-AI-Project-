@@ -1,0 +1,22 @@
+{
+  "seconds": 17.23541289998684,
+  "items": [
+    {
+      "object_type": "electric_wire",
+      "object_label": "전선",
+      "confidence": 0.3736,
+      "bbox": [
+        0.4116283655166626,
+        0.00151805579662323,
+        0.03724503517150879,
+        0.059798210859298706
+      ],
+      "evidence": [
+        "visible_cable"
+      ],
+      "evidence_source": "grounding_dino_image",
+      "detector": "grounding_dino",
+      "score_kind": "model_match_not_calibrated_probability"
+    }
+  ]
+}

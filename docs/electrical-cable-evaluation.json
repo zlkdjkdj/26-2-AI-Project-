@@ -1,0 +1,38 @@
+{
+  "scope": "One public close-up photograph; two visible cable segments manually boxed for a development regression. Not a representative accuracy benchmark.",
+  "iou_threshold": 0.5,
+  "cases": [
+    {
+      "image": "power-strip.jpg",
+      "labels": 2,
+      "baseline": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 2,
+        "precision": null,
+        "recall": 0.0,
+        "seconds": 23.27,
+        "predictions": []
+      },
+      "refined": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.5,
+        "seconds": 31.0,
+        "predictions": [
+          {
+            "bbox": [
+              0.8534833468876188,
+              0.706416665529742,
+              0.14537672887658282,
+              0.15974269095018206
+            ],
+            "model_score": 0.4563
+          }
+        ]
+      }
+    }
+  ]
+}

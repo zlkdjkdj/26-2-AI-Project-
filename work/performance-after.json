@@ -1,0 +1,16 @@
+[
+  {
+    "image": "power-strip.jpg",
+    "before_seconds": 33.704214900004445,
+    "after_seconds": 23.82115229999181,
+    "identical": true,
+    "calls": 2
+  },
+  {
+    "image": "indoor.jpg",
+    "before_seconds": 42.49355120002292,
+    "after_seconds": 25.65305769999395,
+    "identical": true,
+    "calls": 1
+  }
+]

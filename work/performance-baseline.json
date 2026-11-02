@@ -1,0 +1,215 @@
+[
+  {
+    "image": "power-strip.jpg",
+    "yolo_seconds": 0.31620900001144037,
+    "electrical_seconds": 33.704214900004445,
+    "query_seconds": [
+      4.488,
+      5.736,
+      6.876,
+      6.853,
+      7.037
+    ],
+    "yolo": [
+      {
+        "object_type": "cell_phone",
+        "object_label": "휴대폰",
+        "confidence": 0.7204,
+        "bbox": [
+          0.29406813633294754,
+          0.2343958925317835,
+          0.611463005160108,
+          0.7020292105498137
+        ],
+        "evidence": [],
+        "evidence_source": "yolo_image_geometry"
+      }
+    ],
+    "electrical": [
+      {
+        "object_type": "socket",
+        "object_label": "콘센트",
+        "confidence": 0.4913,
+        "bbox": [
+          0.0007578432559967041,
+          0.16963714361190796,
+          0.9042329788208008,
+          0.7744053602218628
+        ],
+        "evidence": [
+          "visible_socket"
+        ],
+        "evidence_source": "grounding_dino_image",
+        "detector": "grounding_dino",
+        "score_kind": "model_match_not_calibrated_probability",
+        "classification_uncertain": true,
+        "alternative_labels": [
+          "전선",
+          "멀티탭"
+        ],
+        "reference_check": {
+          "kind": "power_strip",
+          "match_score": 0.6588,
+          "score_kind": "uncalibrated_classifier_score",
+          "source": "zenodo_18835199_lite_classifier"
+        }
+      },
+      {
+        "object_type": "electric_wire",
+        "object_label": "전선",
+        "confidence": 0.4353,
+        "bbox": [
+          0.8539196804036464,
+          0.7065449710643265,
+          0.14470822397760233,
+          0.15895524099979075
+        ],
+        "evidence": [
+          "image_low_cable"
+        ],
+        "evidence_source": "grounding_dino_image",
+        "detector": "grounding_dino",
+        "refined_crop": true,
+        "refinement": "cable_candidate",
+        "score_kind": "model_match_not_calibrated_probability"
+      }
+    ]
+  },
+  {
+    "image": "indoor.jpg",
+    "yolo_seconds": 0.3049057000025641,
+    "electrical_seconds": 42.49355120002292,
+    "query_seconds": [
+      7.034,
+      7.122,
+      7.049,
+      7.344,
+      7.027,
+      6.794
+    ],
+    "yolo": [
+      {
+        "object_type": "tv",
+        "object_label": "TV",
+        "confidence": 0.9245,
+        "bbox": [
+          0.009701919555664063,
+          0.390044736190581,
+          0.23201003074645996,
+          0.22420734530883216
+        ],
+        "evidence": [
+          "visible_heavy_object"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "chair",
+        "object_label": "의자",
+        "confidence": 0.8541,
+        "bbox": [
+          0.4575371742248535,
+          0.510089999633216,
+          0.09634170532226563,
+          0.22380273666740025
+        ],
+        "evidence": [
+          "image_lower_center"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "person",
+        "object_label": "사람",
+        "confidence": 0.6949,
+        "bbox": [
+          0.6474193096160888,
+          0.36834473229350057,
+          0.07945880889892579,
+          0.33221220634352994
+        ],
+        "evidence": [],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "chair",
+        "object_label": "의자",
+        "confidence": 0.4992,
+        "bbox": [
+          0.5641645431518555,
+          0.5107393219997066,
+          0.09045181274414063,
+          0.2139697724105047
+        ],
+        "evidence": [
+          "image_lower_center"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "chair",
+        "object_label": "의자",
+        "confidence": 0.4763,
+        "bbox": [
+          0.6119696617126464,
+          0.5113076939829079,
+          0.08202362060546875,
+          0.21328721024061034
+        ],
+        "evidence": [
+          "image_lower_center"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "potted_plant",
+        "object_label": "화분",
+        "confidence": 0.4419,
+        "bbox": [
+          0.35306606292724607,
+          0.4149265199759756,
+          0.06409788131713867,
+          0.08528244663292253
+        ],
+        "evidence": [
+          "visible_heavy_object"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      },
+      {
+        "object_type": "vase",
+        "object_label": "꽃병",
+        "confidence": 0.352,
+        "bbox": [
+          0.857665729522705,
+          0.7125785720180458,
+          0.058273696899414064,
+          0.2285250811509683
+        ],
+        "evidence": [
+          "visible_heavy_object"
+        ],
+        "evidence_source": "yolo_image_geometry"
+      }
+    ],
+    "electrical": [
+      {
+        "object_type": "electric_wire",
+        "object_label": "전선",
+        "confidence": 0.3736,
+        "bbox": [
+          0.4116283655166626,
+          0.00151805579662323,
+          0.03724503517150879,
+          0.059798210859298706
+        ],
+        "evidence": [
+          "visible_cable"
+        ],
+        "evidence_source": "grounding_dino_image",
+        "detector": "grounding_dino",
+        "score_kind": "model_match_not_calibrated_probability"
+      }
+    ]
+  }
+]
