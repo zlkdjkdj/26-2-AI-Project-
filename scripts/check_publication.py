@@ -35,11 +35,15 @@ def local_secret_values():
                 continue
             for line in file.read_text(errors='replace').splitlines():
                 match = re.match(r'(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)', line.strip())
-                if not match or not re.search(r'(?:API_KEY|TOKEN|SECRET|PASSWORD|DATABASE_URL)$', match[1]):
+                if not match or not re.search(r'(?:API_KEY|TOKEN|SECRET|PASSWORD|DATABASE_URL|ACCESS_CODE)$', match[1]):
                     continue
                 value = match[2].strip().strip('\"\'')
                 if len(value) >= 12 and not value.startswith('#'):
                     values.add(value.encode())
+    code_file=ROOT/'backend/data/demo-access-code.txt'
+    if code_file.is_file():
+        code=code_file.read_bytes().strip()
+        if len(code)>=16:values.add(code)
     return values
 
 
