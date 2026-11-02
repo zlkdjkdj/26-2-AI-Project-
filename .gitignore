@@ -59,6 +59,7 @@ local.properties
 
 # Dependencies, generated output, caches and runtime logs.
 .venv/
+.venv-win/
 venv/
 node_modules/
 dist/
