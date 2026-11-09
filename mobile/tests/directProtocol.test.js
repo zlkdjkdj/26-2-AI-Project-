@@ -21,6 +21,8 @@ test('media candidates stay inside Tailnet and fail clearly when the VPN route i
   assert.doesNotMatch(result, /192\.168|8\.8\.8\.8/);
   assert.match(result, /fingerprint/);
   assert.throws(() => tailnetSdp('v=0\r\na=candidate:1 1 udp 123 192.168.0.1 5555 typ host\r\n'), /Tailscale/);
+  assert.throws(() => tailnetSdp('v=0\r\n', { tailnetInterface: false, vpnNetwork: false }), /연결이 꺼져/);
+  assert.throws(() => tailnetSdp('v=0\r\na=candidate:1 1 udp 123 192.168.0.1 5555 typ host\r\n', { tailnetInterface: true, vpnNetwork: true }), /T1\/V1\/C1/);
 });
 test('viewer credentials remain out of URLs; requests carry no browser cookies', async () => {
   await directRequest(origin, '/v1/status', { token }, async (url, init) => {

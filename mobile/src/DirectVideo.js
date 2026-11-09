@@ -8,8 +8,9 @@ import { excludeUnsupportedAv1 } from './videoCodecs';
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function description(peer) {
-  for (let i = 0; i < 60 && peer.iceGatheringState !== 'complete'; i++) await pause(100);
-  return tailnetSdp(peer.localDescription.sdp);
+  for (let i = 0; i < 100 && peer.iceGatheringState !== 'complete'; i++) await pause(100);
+  const network = await Bridge.networkStatus();
+  return tailnetSdp(peer.localDescription.sdp, network);
 }
 
 // Each mounted session owns and closes its peer and media tracks.
@@ -47,7 +48,7 @@ export default function DirectVideo({ camera, connection, fit = 'contain', onSto
           if (offerId) { closePeer(); offerId = ''; update('모니터링 기기 연결 대기 중'); }
         } else if (offer.id !== offerId) {
           closePeer();
-          const current = new RTCPeerConnection({ iceServers: [] });
+          const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all' });
           peer = current; offerId = offer.id;
           attach(current);
           media.getTracks().forEach((track) => current.addTrack(track, media));
@@ -79,7 +80,7 @@ export default function DirectVideo({ camera, connection, fit = 'contain', onSto
         if (!active || attempt !== generation) return;
         if (status.id !== connection.id) throw Object.assign(new Error('등록된 공기계가 아닙니다. QR로 다시 등록하세요.'), { status: 401 });
         if (!status.ready) throw new Error('공기계에서 촬영 시작을 눌러 주세요. 자동으로 다시 확인합니다.');
-        const current = new RTCPeerConnection({ iceServers: [] });
+        const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all' });
         peer = current;
         attach(current, viewerStart);
         current.addTransceiver('video', { direction: 'recvonly' });

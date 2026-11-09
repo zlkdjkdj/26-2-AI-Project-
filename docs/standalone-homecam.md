@@ -53,3 +53,17 @@ Kotlin socket 테스트 4개는 모두 통과했습니다. 현재 WebRTC Android
 연결 실패 시 두 기기의 Tailscale과 공기계 촬영 시작 여부부터 확인합니다. Tailscale을 나중에 켰다면 공기계의 **Tailscale 연결 다시 확인**을 누릅니다. 영상용 VPN 경로를 찾지 못했다는 메시지는 Tailscale을 먼저 켜고 앱을 재실행한 뒤 다시 확인합니다.
 
 참고: [Expo 로컬 모듈](https://docs.expo.dev/modules/get-started/), [Expo Router 설치](https://docs.expo.dev/router/installation/), [React Native Hermes](https://reactnative.dev/docs/hermes).
+
+## 1.1.1 VPN 영상 후보 수집 수정
+
+1.1.0에서 사용자가 모니터링 화면의 ‘영상용 Tailscale 경로를 찾지 못했습니다’ 오류를 보고했습니다. 이는 인증된 공기계 상태 조회 뒤 영상 후보 검사에서 중단되는 경로입니다. Tailscale HTTP 연결과 WebRTC의 VPN 인터페이스 수집은 별개로 확인해야 합니다.
+
+`withTailnetWebRTC.cjs`에서 React/WebRTC 초기화 전에 NetworkMonitorAutoDetect의 VPN 요청·다른 UID 네트워크 수집을 켜고 초기 캐시 의존을 끕니다. 실제 사용 중인 Jitsi WebRTC 155.0.1 바이너리의 옵션 이름·파서를 확인했습니다. 공용/LAN 영상 후보는 계속 제외하며, 영상 수집 대기와 실패 진단을 보완했습니다. 진단 T/V/C는 Tailnet 인터페이스 여부·VPN 관찰 여부·영상 후보 개수이며 IP·SSID·인증 토큰을 표시하지 않습니다.
+
+촬영용·모니터링용 **두 휴대폰 모두 업데이트**하고 Tailscale 연결 후 앱을 완전히 재실행합니다. 같은 패키지·서명과 저장 형식을 유지하므로 기존 QR 등록을 재사용할 수 있습니다. 실제 연결 복구는 수정 APK 설치 후 확인해야 합니다. 여전히 실패하면 화면의 T/V/C 코드와 오류 문구로 다음 원인을 확인합니다.
+
+새 prebuild에는 app.json의 config plugin이 적용됩니다. 기존 로컬 생성 프로젝트에는 `node scripts/apply-android-mods.cjs`로 같은 Expo mod와 버전 설정을 적용하여 CMake 캐시를 유지할 수 있습니다.
+
+1.1.1/versionCode 4의 ARM64/ARM32 release APK 빌드, 내장 번들·컴파일된 VPN 옵션·서명 검증을 완료했습니다. JavaScript 10개와 Kotlin socket 4개, lint/typecheck가 통과했습니다. 연결 복구 여부는 사용자 두 휴대폰에서 업데이트 후 확인하는 단계입니다.
+
+근거: [WebRTC VPN 수집 구현](https://webrtc.googlesource.com/src/+/refs/heads/main/sdk/android/api/org/webrtc/NetworkMonitorAutoDetect.java), [Android 네트워크 UID 수집 API](https://developer.android.com/reference/android/net/NetworkRequest.Builder#setIncludeOtherUidNetworks(boolean)).

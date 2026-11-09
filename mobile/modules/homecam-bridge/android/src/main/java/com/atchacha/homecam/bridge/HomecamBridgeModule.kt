@@ -4,6 +4,9 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 
 class HomecamBridgeModule : Module() {
   private var server: HomecamServer? = null
@@ -11,6 +14,16 @@ class HomecamBridgeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HomecamBridge")
     Function("createSecret") { HomecamServer.secret() }
+    AsyncFunction("networkStatus") {
+      val hasTailnet = NetworkInterface.getNetworkInterfaces().toList()
+        .filter { it.isUp }.flatMap { it.inetAddresses.toList() }
+        .filterIsInstance<Inet4Address>().any { HomecamServer.isTailnet(it.hostAddress ?: "") }
+      val manager = appContext.reactContext?.getSystemService(ConnectivityManager::class.java)
+      val hasVpn = manager?.allNetworks?.any {
+        manager.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+      } ?: false
+      mapOf("tailnetInterface" to hasTailnet, "vpnNetwork" to hasVpn, "androidVersion" to Build.VERSION.SDK_INT)
+    }
     AsyncFunction("start") { token: String, id: String ->
       server?.close()
       val addresses = NetworkInterface.getNetworkInterfaces().toList()

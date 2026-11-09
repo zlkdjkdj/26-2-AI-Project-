@@ -49,9 +49,14 @@ export async function directRequest(origin, path, { token, json, method, signal 
 }
 
 // Restrict media candidates to the encrypted Tailnet, with no public STUN/TURN dependency.
-export function tailnetSdp(sdp) {
+export function tailnetSdp(sdp, network) {
   const lines = sdp.split(/\r?\n/);
   const candidates = lines.filter((line) => line.startsWith('a=candidate:') && isTailnet(line.split(/\s+/)[4] || ''));
-  if (!candidates.length) throw new Error('영상용 Tailscale 경로를 찾지 못했습니다. Tailscale을 먼저 켠 뒤 앱을 다시 실행하세요.');
+  if (!candidates.length) {
+    if (network?.tailnetInterface === false) throw new Error('이 휴대폰의 Tailscale 연결이 꺼져 있습니다. Tailscale 연결 후 다시 시도하세요.');
+    const count = lines.filter((line) => line.startsWith('a=candidate:')).length;
+    const diagnostic = network ? `T${Number(network.tailnetInterface)}/V${Number(network.vpnNetwork)}/C${count}` : `C${count}`;
+    throw new Error(`Tailscale 영상 경로 수집에 실패했습니다. 두 휴대폰의 앱을 업데이트한 뒤 완전히 종료하고 다시 실행하세요. [${diagnostic}]`);
+  }
   return lines.filter((line) => !line.startsWith('a=candidate:') || candidates.includes(line)).join('\r\n');
 }
