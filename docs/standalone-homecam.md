@@ -78,8 +78,8 @@ RN WebRTC 155.0.1이 해당 factory 옵션을 노출하지 않아 `patches/react
 
 영상 후보는 기존 `100.64.0.0/10`에 Tailscale 전용 IPv6 `fd7a:115c:a1e0::/48`을 추가합니다. 일반 LAN·임의 ULA·공용 IPv6는 계속 거부하며, HTTP 주소와 QR 등록은 기존 IPv4를 유지합니다. 존재하지 않는 후보를 만들거나 물리 네트워크 주소를 Tailnet 주소로 치환하지 않습니다. 초기 수집 완료 이벤트가 먼저 와도 Tailnet 후보를 기다리고, 실패 시 I4/I6 후보 개수만 추가로 표시합니다.
 
-사용자는 **양쪽 휴대폰을 함께 업데이트**하고 Tailscale 연결 후 앱을 재실행해야 합니다. 실제 영상 복구는 새 APK로 재검수해야 합니다.
+사용자는 **양쪽 휴대폰을 함께 업데이트**하고 Tailscale 연결 후 앱을 재실행해야 합니다. 2026-11-09 사용자가 1.1.2에서 정상 작동을 확인했습니다. 기존 T1/V1/C8 오류 후 휴대폰 간 영상 연결이 복구된 것으로 기록합니다. PC를 끈 상태·모바일 데이터 전환·장시간 연속 동작은 이번 확인에서 별도로 보고되지 않았으므로 추가 검수 항목으로 남깁니다.
 
-1.1.2/versionCode 5 release APK 빌드·서명·ARM64/ARM32 라이브러리·내장 IPv6 필터를 확인했습니다. 컴파일된 초기화 코드에서 `disableNetworkMonitor=true`, `disableEncryption=false`, 제외 마스크=loopback 값을 확인했습니다. 깨끗한 `npm ci`에서 패치 자동 적용, JavaScript 11개·lint/typecheck·Expo 의존성 호환성 검사와 감사가 통과했습니다. Kotlin socket 테스트 4개도 Gradle에서 확인했습니다. 이 검증을 실제 휴대폰의 영상 복구 확인으로 해석하지 않습니다.
+1.1.2/versionCode 5 release APK 빌드·서명·ARM64/ARM32 라이브러리·내장 IPv6 필터를 확인했습니다. 컴파일된 초기화 코드에서 `disableNetworkMonitor=true`, `disableEncryption=false`, 제외 마스크=loopback 값을 확인했습니다. 깨끗한 `npm ci`에서 패치 자동 적용, JavaScript 11개·lint/typecheck·Expo 의존성 호환성 검사와 감사가 통과했습니다. Kotlin socket 테스트 4개도 Gradle에서 확인했습니다. 위의 사용자 실기기 확인은 이 자동 검사와 별도의 결과입니다.
 
 근거: [WebRTC factory 네트워크 모니터 옵션](https://webrtc.googlesource.com/src/+/refs/heads/main/api/peer_connection_interface.h), [Tailscale IPv6 범위](https://tailscale.com/docs/concepts/ipv6).
