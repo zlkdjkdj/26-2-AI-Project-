@@ -83,3 +83,9 @@ RN WebRTC 155.0.1이 해당 factory 옵션을 노출하지 않아 `patches/react
 1.1.2/versionCode 5 release APK 빌드·서명·ARM64/ARM32 라이브러리·내장 IPv6 필터를 확인했습니다. 컴파일된 초기화 코드에서 `disableNetworkMonitor=true`, `disableEncryption=false`, 제외 마스크=loopback 값을 확인했습니다. 깨끗한 `npm ci`에서 패치 자동 적용, JavaScript 11개·lint/typecheck·Expo 의존성 호환성 검사와 감사가 통과했습니다. Kotlin socket 테스트 4개도 Gradle에서 확인했습니다. 위의 사용자 실기기 확인은 이 자동 검사와 별도의 결과입니다.
 
 근거: [WebRTC factory 네트워크 모니터 옵션](https://webrtc.googlesource.com/src/+/refs/heads/main/api/peer_connection_interface.h), [Tailscale IPv6 범위](https://tailscale.com/docs/concepts/ipv6).
+
+## 1.2.0 디자인 통합
+
+웹과 Android의 색·서체·간격·버튼·아이콘을 통일했습니다. 앱의 역할 선택, 촬영 설정과 일회용 QR, 모니터링, 사진 점검, PC 웹 홈캠 연결을 같은 시각 체계로 정리했습니다. 기존 등록 저장소·앱 패키지·서명은 유지하며 업데이트를 위해 앱 데이터를 지울 필요는 없습니다. Expo 기본 아이콘은 사진 확인을 뜻하는 모서리 프레임 로고로 바꿨습니다.
+
+Tailscale 영상 후보, WebRTC factory 옵션과 암호화, QR 유효기간, 인증·접근 범위, 사진 점수와 권고 규칙은 변경하지 않았습니다. 상세 디자인과 검증 범위는 [design-system.md](design-system.md)를 참고하세요. 새 버전의 실기기 UI·영상 동작은 설치 후 검수가 필요합니다.

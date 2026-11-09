@@ -1,6 +1,23 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 export default function Layout() {
-  return <SafeAreaProvider><StatusBar style="dark" /><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f4f6f1' } }} /></SafeAreaProvider>;
+  const [loaded, error] = useFonts({
+    "SUIT-Regular": require("../../assets/fonts/SUIT-Regular.ttf"),
+    "SUIT-Medium": require("../../assets/fonts/SUIT-Medium.ttf"),
+    "SUIT-SemiBold": require("../../assets/fonts/SUIT-SemiBold.ttf"),
+  });
+  if (!loaded && !error) return null;
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="dark" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: "#f7f8f5" },
+        }}
+      />
+    </SafeAreaProvider>
+  );
 }

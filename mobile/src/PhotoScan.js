@@ -15,6 +15,7 @@ import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import { serverAddress } from "./api";
 import { scoreMessage } from "./scanFeedback";
+import { BackLink, colors as c, fonts as f } from "./ui";
 
 const targets = {
   elderly: "노약자",
@@ -41,6 +42,8 @@ function Choice({ items, value, onChange }) {
       {Object.entries(items).map(([key, label]) => (
         <Pressable
           key={key}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === key }}
           onPress={() => onChange(key)}
           style={[s.chip, value === key && s.selected]}
         >
@@ -64,7 +67,7 @@ function Button({ title, onPress, disabled, secondary }) {
         disabled && { opacity: 0.45 },
       ]}
     >
-      <Text style={[s.buttonText, secondary && { color: "#315b40" }]}>
+      <Text style={[s.buttonText, secondary && { color: "#255345" }]}>
         {title}
       </Text>
     </Pressable>
@@ -103,12 +106,21 @@ export default function PhotoScan({ initialServer, onBack }) {
   useEffect(() => {
     if (!server) return;
     let address;
-    try { address = serverAddress(server); } catch { return; }
+    try {
+      address = serverAddress(server);
+    } catch {
+      return;
+    }
     let active = true;
-    expoFetch(`${address}/api/demo/status`, { credentials: "include" }).then((response) => response.json()).then((data) => {
-      if (active && data.unlocked) setCsrf(data.csrf_token);
-    }).catch(() => {});
-    return () => { active = false; };
+    expoFetch(`${address}/api/demo/status`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (active && data.unlocked) setCsrf(data.csrf_token);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [server]);
   async function unlock() {
     setBusy(true);
@@ -208,10 +220,8 @@ export default function PhotoScan({ initialServer, onBack }) {
       contentContainerStyle={s.page}
       keyboardShouldPersistTaps="handled"
     >
-      <Pressable onPress={onBack}>
-        <Text style={s.back}>‹ 홈캠으로</Text>
-      </Pressable>
-      <Text style={s.eyebrow}>PHOTO SAFETY CHECK</Text>
+      <BackLink onPress={onBack} />
+      <Text style={s.eyebrow}>사진 안전점검</Text>
       <Text style={s.title}>
         사진으로 살피는
         {"\n"}
@@ -291,7 +301,7 @@ export default function PhotoScan({ initialServer, onBack }) {
                           height: `${h.bbox[3] * 100}%`,
                           borderWidth: 2,
                           borderColor:
-                            h.risk_level === "HIGH" ? "#e45849" : "#e2a642",
+                            h.risk_level === "HIGH" ? "#a23d30" : "#8a5b16",
                         }}
                       >
                         <Text style={s.marker}>{i + 1}</Text>
@@ -312,18 +322,21 @@ export default function PhotoScan({ initialServer, onBack }) {
               onPress={analyze}
               disabled={!photo || busy}
             />
-            {busy && <ActivityIndicator color="#315b40" />}
+            {busy && <ActivityIndicator color="#255345" />}
           </View>
           {result && (
             <View style={s.card}>
-              <Text style={s.eyebrow}>SAFETY FEEDBACK</Text>
+              <Text style={s.eyebrow}>사진 피드백</Text>
               <Text style={s.score}>
                 {result.score_computable === false
                   ? "점수 산정 불가"
                   : `${result.safety_score}점`}
               </Text>
               <Text style={s.body}>{scoreMessage(result)}</Text>
-              <Text style={s.note}>탐지된 물건 {result.detected_objects?.length || 0}개 · 위험 확인 항목 {result.hazards?.length || 0}개</Text>
+              <Text style={s.note}>
+                탐지된 물건 {result.detected_objects?.length || 0}개 · 위험 확인
+                항목 {result.hazards?.length || 0}개
+              </Text>
               <Text style={s.note}>{result.notice}</Text>
               {result.hazards?.length ? (
                 result.hazards.map((h, i) => (
@@ -367,70 +380,98 @@ export default function PhotoScan({ initialServer, onBack }) {
 }
 
 const s = StyleSheet.create({
-  page: { padding: 22, paddingBottom: 48, gap: 16 },
-  back: { color: "#315b40", fontWeight: "700", fontSize: 15 },
-  eyebrow: {
-    color: "#618467",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-  },
-  title: { color: "#233e2c", fontSize: 29, fontWeight: "800", lineHeight: 40 },
+  page: { padding: 24, paddingBottom: 48, gap: 20 },
+  eyebrow: { color: c.accent, fontSize: 13, fontFamily: f.medium },
+  title: { color: c.ink, fontSize: 32, fontFamily: f.medium, lineHeight: 42 },
   card: {
-    padding: 20,
-    borderRadius: 18,
-    backgroundColor: "white",
+    padding: 24,
+    borderRadius: 12,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: "#e1e8dd",
-    gap: 14,
+    borderColor: c.line,
+    gap: 16,
   },
-  heading: { fontWeight: "700", color: "#284531", fontSize: 17 },
-  note: { color: "#718075", fontSize: 12, lineHeight: 21 },
-  label: { color: "#4d6552", fontSize: 13, fontWeight: "700" },
+  heading: { fontFamily: f.medium, color: c.ink, fontSize: 18, lineHeight: 26 },
+  note: { color: c.muted, fontSize: 13, lineHeight: 22, fontFamily: f.regular },
+  label: { color: c.secondary, fontSize: 14, fontFamily: f.medium },
   input: {
     borderWidth: 1,
-    borderColor: "#dce5d7",
-    borderRadius: 10,
-    padding: 13,
-    color: "#284232",
+    borderColor: "#b6c1b8",
+    borderRadius: 8,
+    minHeight: 48,
+    padding: 12,
+    color: c.ink,
+    fontFamily: f.regular,
   },
-  row: { flexDirection: "row", gap: 8 },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   button: {
-    backgroundColor: "#315b40",
-    padding: 14,
-    borderRadius: 10,
+    backgroundColor: c.accent,
+    minHeight: 48,
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
     flexGrow: 1,
   },
-  secondary: { backgroundColor: "#edf3e9" },
-  buttonText: { color: "white", fontWeight: "700", fontSize: 13 },
+  secondary: {
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.line,
+  },
+  buttonText: {
+    color: "white",
+    fontFamily: f.medium,
+    fontSize: 14,
+    lineHeight: 22,
+  },
   choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    backgroundColor: "#f1f4ef",
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.line,
+    minHeight: 44,
+    justifyContent: "center",
     paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
   },
-  selected: { backgroundColor: "#315b40" },
-  chipText: { fontSize: 12, color: "#617064" },
+  selected: { backgroundColor: c.accent, borderColor: c.accent },
+  chipText: { fontSize: 13, color: c.secondary, fontFamily: f.regular },
   selectedText: { color: "white" },
-  score: { fontSize: 32, color: "#315b40", fontWeight: "800" },
+  score: { fontSize: 36, color: c.accent, fontFamily: f.medium },
   marker: {
     color: "white",
-    backgroundColor: "#d85a49",
+    backgroundColor: "#a23d30",
     fontSize: 11,
+    fontFamily: f.medium,
     alignSelf: "flex-start",
     paddingHorizontal: 4,
   },
-  hazard: { borderTopWidth: 1, borderColor: "#e5ebe5", paddingTop: 15, gap: 7 },
-  hazardTitle: { color: "#294331", fontWeight: "800", fontSize: 15 },
-  body: { color: "#56675b", lineHeight: 22, fontSize: 13 },
-  advice: { color: "#315b40", lineHeight: 22, fontWeight: "700", fontSize: 13 },
+  hazard: { borderTopWidth: 1, borderColor: c.line, paddingTop: 20, gap: 12 },
+  hazardTitle: {
+    color: c.ink,
+    fontFamily: f.medium,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  body: {
+    color: c.secondary,
+    lineHeight: 24,
+    fontSize: 14,
+    fontFamily: f.regular,
+  },
+  advice: {
+    color: c.accent,
+    lineHeight: 24,
+    fontFamily: f.medium,
+    fontSize: 14,
+  },
   error: {
-    color: "#aa4039",
-    backgroundColor: "#fff0ed",
-    padding: 14,
-    borderRadius: 10,
-    lineHeight: 20,
+    color: c.danger,
+    backgroundColor: "#faf1ef",
+    padding: 16,
+    borderRadius: 8,
+    lineHeight: 22,
+    fontFamily: f.regular,
   },
 });

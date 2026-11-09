@@ -1,23 +1,185 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
-export function Button({ children, onPress, secondary, disabled, danger }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} disabled={disabled}
-    style={({ pressed }) => [s.button, secondary && s.secondary, danger && { backgroundColor: '#983e35' }, (pressed || disabled) && { opacity: 0.5 }]}>
-    <Text style={[s.buttonText, secondary && { color: '#264a38' }]}>{children}</Text>
-  </Pressable>;
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ArrowLeft, ScanLine } from "lucide-react-native";
+export const colors = {
+  page: "#f7f8f5",
+  surface: "#ffffff",
+  raised: "#eef1ec",
+  ink: "#22312b",
+  secondary: "#56635c",
+  muted: "#6b756e",
+  line: "#dce2dc",
+  accent: "#255345",
+  accentSoft: "#eaf0e8",
+  danger: "#92392e",
+};
+export const fonts = {
+  regular: "SUIT-Regular",
+  medium: "SUIT-Medium",
+  semibold: "SUIT-SemiBold",
+};
+export function Button({
+  children,
+  onPress,
+  secondary,
+  disabled,
+  danger,
+  icon: Icon,
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        s.button,
+        secondary && s.secondary,
+        danger && s.danger,
+        (pressed || disabled) && { opacity: 0.5 },
+      ]}
+    >
+      {Icon && (
+        <Icon
+          size={18}
+          strokeWidth={1.5}
+          color={danger ? colors.danger : secondary ? colors.accent : "#fff"}
+        />
+      )}
+      <Text
+        style={[
+          s.buttonText,
+          secondary && { color: colors.accent },
+          danger && { color: colors.danger },
+        ]}
+      >
+        {children}
+      </Text>
+    </Pressable>
+  );
+}
+export function Brand() {
+  return (
+    <View style={s.brandRow}>
+      <ScanLine size={28} color={colors.accent} strokeWidth={1.5} />
+      <Text style={s.brand}>앗차차</Text>
+    </View>
+  );
+}
+export function BackLink({ onPress }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={s.back}>
+      <ArrowLeft size={18} color={colors.secondary} strokeWidth={1.5} />
+      <Text style={s.backText}>홈으로</Text>
+    </Pressable>
+  );
 }
 export const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f4f6f1' },
-  content: { padding: 24, gap: 18, paddingBottom: 48 },
-  brand: { color: '#284f3a', fontSize: 22, fontWeight: '800' },
-  eyebrow: { color: '#588168', fontSize: 12, letterSpacing: 2, fontWeight: '700' },
-  title: { color: '#193f2d', fontSize: 34, lineHeight: 44, fontWeight: '800' },
-  section: { color: '#234933', fontSize: 20, lineHeight: 28, fontWeight: '700' },
-  text: { color: '#5e6d62', fontSize: 15, lineHeight: 24 },
-  card: { backgroundColor: '#fff', padding: 22, borderRadius: 24, gap: 14, borderColor: '#dde6da', borderWidth: 1 },
-  button: { padding: 16, borderRadius: 16, backgroundColor: '#315c42', alignItems: 'center' },
-  secondary: { backgroundColor: '#e5eddf' },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  message: { padding: 16, backgroundColor: '#edf0df', borderRadius: 16, color: '#4e6039', lineHeight: 22 },
-  toolbar: { padding: 16, gap: 10, backgroundColor: '#f4f6f1' },
-  row: { flexDirection: 'row', gap: 10 },
+  safe: { flex: 1, backgroundColor: colors.page },
+  content: { padding: 24, gap: 20, paddingBottom: 48 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  brand: { color: colors.ink, fontSize: 24, fontFamily: fonts.semibold },
+  eyebrow: { color: colors.accent, fontSize: 13, fontFamily: fonts.medium },
+  title: {
+    color: colors.ink,
+    fontSize: 32,
+    lineHeight: 42,
+    fontFamily: fonts.medium,
+    letterSpacing: -0.8,
+  },
+  section: {
+    color: colors.ink,
+    fontSize: 20,
+    lineHeight: 28,
+    fontFamily: fonts.medium,
+  },
+  text: {
+    color: colors.secondary,
+    fontSize: 15,
+    lineHeight: 24,
+    fontFamily: fonts.regular,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    padding: 24,
+    borderRadius: 12,
+    gap: 16,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
+  button: {
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  secondary: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  danger: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "#e4c5bf",
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fonts.medium,
+    textAlign: "center",
+    flexShrink: 1,
+  },
+  message: {
+    padding: 16,
+    backgroundColor: colors.raised,
+    borderRadius: 8,
+    color: colors.secondary,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  toolbar: { padding: 16, gap: 12, backgroundColor: colors.page },
+  row: { flexDirection: "row", gap: 12 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    minHeight: 48,
+    marginTop: -8,
+  },
+  backText: { color: colors.secondary, fontFamily: fonts.medium, fontSize: 14 },
+  roleHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  roleIcon: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roleNumber: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12 },
+  divider: { height: 1, backgroundColor: colors.line, marginVertical: 4 },
+  footnote: {
+    color: colors.muted,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 20,
+  },
 });

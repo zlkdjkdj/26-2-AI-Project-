@@ -2,7 +2,7 @@
   "expo": {
     "name": "앗차차 홈캠",
     "slug": "atchacha-homecam",
-    "version": "1.1.2",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,12 +15,12 @@
         "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#edf3e9",
+        "backgroundColor": "#f7f8f5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "versionCode": 5
+      "versionCode": 6
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -50,7 +50,8 @@
       ],
       "expo-router",
       "./plugins/withStandaloneBundle.cjs",
-      "./plugins/withTailnetWebRTC.cjs"
+      "./plugins/withTailnetWebRTC.cjs",
+      "expo-font"
     ],
     "scheme": "atchacha"
   }

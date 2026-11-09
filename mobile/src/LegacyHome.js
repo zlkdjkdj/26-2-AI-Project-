@@ -16,6 +16,7 @@ import { cameraRequest, serverAddress } from "./api";
 import VideoCamera from "./VideoCamera";
 import PhotoScan from "./PhotoScan";
 import { parsePairQr } from "./pairQr";
+import { colors as c, fonts as f } from "./ui";
 
 const STORAGE = "atchacha.homecam.connection";
 
@@ -181,9 +182,9 @@ export default function App() {
               setPage("photo");
             }}
           >
-            📷 사진 안전점검 열기
+            사진 안전점검 열기
           </Button>
-          <Text style={styles.eyebrow}>MOBILE HOME CAM · BETA</Text>
+          <Text style={styles.eyebrow}>PC 웹 홈캠 연결</Text>
           <Text style={styles.title}>
             {connection ? connection.name : "휴대폰을\n우리집 홈캠으로."}
           </Text>
@@ -346,109 +347,118 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f6f8f3" },
-  content: { padding: 24, paddingBottom: 48, gap: 16 },
+  safe: { flex: 1, backgroundColor: c.page },
+  content: { padding: 24, paddingBottom: 48, gap: 20 },
   brand: {
-    fontWeight: "900",
-    fontSize: 27,
-    color: "#233e2c",
-    marginBottom: 16,
+    fontFamily: f.semibold,
+    fontSize: 24,
+    color: c.ink,
+    marginBottom: 12,
   },
-  eyebrow: {
-    fontSize: 10,
-    letterSpacing: 2,
-    color: "#5c7e62",
-    fontWeight: "700",
-  },
-  title: {
-    fontSize: 34,
-    lineHeight: 44,
-    fontWeight: "800",
-    letterSpacing: -1.5,
-    color: "#253f2c",
-  },
+  eyebrow: { fontSize: 13, color: c.accent, fontFamily: f.medium },
+  title: { fontSize: 32, lineHeight: 42, fontFamily: f.medium, color: c.ink },
   description: {
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 24,
-    color: "#6e7e70",
-    marginBottom: 8,
+    color: c.secondary,
+    fontFamily: f.regular,
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 22,
-    gap: 12,
+    backgroundColor: c.surface,
+    borderRadius: 12,
+    padding: 24,
+    gap: 16,
     borderWidth: 1,
-    borderColor: "#e1e8dd",
+    borderColor: c.line,
   },
-  section: { fontSize: 17, fontWeight: "700", color: "#2e4b36" },
-  hint: { fontSize: 12, lineHeight: 21, color: "#7a887a" },
-  label: { fontSize: 12, color: "#4a624d", marginTop: 9 },
+  section: { fontSize: 20, lineHeight: 28, fontFamily: f.medium, color: c.ink },
+  hint: { fontSize: 13, lineHeight: 22, color: c.muted, fontFamily: f.regular },
+  label: {
+    fontSize: 14,
+    color: c.secondary,
+    marginTop: 8,
+    fontFamily: f.medium,
+  },
   input: {
     borderWidth: 1,
-    borderColor: "#dce5d7",
-    borderRadius: 10,
-    padding: 14,
-    color: "#284232",
-    backgroundColor: "#fafcf8",
-    fontSize: 14,
+    borderColor: "#b6c1b8",
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 48,
+    color: c.ink,
+    backgroundColor: c.surface,
+    fontSize: 15,
+    fontFamily: f.regular,
   },
   code: {
     fontSize: 28,
-    letterSpacing: 7,
+    letterSpacing: 4,
     textAlign: "center",
-    fontWeight: "700",
+    fontFamily: f.medium,
   },
   button: {
-    backgroundColor: "#315b40",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: c.accent,
+    minHeight: 48,
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
   },
-  secondary: { backgroundColor: "#edf3e9" },
-  buttonText: { color: "white", fontWeight: "700", fontSize: 14 },
+  secondary: {
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.line,
+  },
+  buttonText: {
+    color: "white",
+    fontFamily: f.medium,
+    fontSize: 15,
+    lineHeight: 22,
+  },
   preview: {
     aspectRatio: 3 / 4,
     overflow: "hidden",
-    borderRadius: 20,
-    backgroundColor: "#1e3025",
+    borderRadius: 12,
+    backgroundColor: "#18211d",
   },
   qrPreview: {
-    height: 260,
-    borderRadius: 14,
+    height: 280,
+    borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#1e3025",
+    backgroundColor: "#18211d",
   },
   placeholder: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 14,
-    padding: 20,
+    gap: 16,
+    padding: 24,
   },
-  placeholderTitle: { color: "#dce9dc", fontSize: 20, fontWeight: "700" },
+  placeholderTitle: { color: "#edf1ed", fontSize: 20, fontFamily: f.medium },
   placeholderText: {
-    color: "#9eb59f",
-    fontSize: 13,
+    color: "#c5cfc8",
+    fontSize: 14,
     lineHeight: 24,
     textAlign: "center",
+    fontFamily: f.regular,
   },
   badge: {
     position: "absolute",
-    top: 14,
-    left: 14,
-    backgroundColor: "#1d3026cc",
-    padding: 9,
-    borderRadius: 8,
+    top: 16,
+    left: 16,
+    backgroundColor: "#18211de6",
+    padding: 12,
+    borderRadius: 4,
   },
-  badgeText: { color: "#e4f2df", fontSize: 11 },
+  badgeText: { color: "#fff", fontSize: 12, fontFamily: f.regular },
   message: {
-    backgroundColor: "#e9f1e3",
+    backgroundColor: c.raised,
     padding: 16,
-    borderRadius: 12,
-    color: "#426343",
-    fontSize: 13,
+    borderRadius: 8,
+    color: c.secondary,
+    fontSize: 14,
     lineHeight: 22,
+    fontFamily: f.regular,
   },
-  note: { padding: 5, gap: 10 },
+  note: { paddingTop: 24, borderTopWidth: 1, borderColor: c.line, gap: 12 },
 });
