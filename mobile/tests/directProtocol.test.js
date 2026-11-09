@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { directOrigin, directRequest, parseDirectQr, savedCamera, tailnetSdp } from '../src/directProtocol.js';
+import { directOrigin, directRequest, isTailnetMedia, parseDirectQr, savedCamera, tailnetSdp } from '../src/directProtocol.js';
 const id = 'a'.repeat(64), pair = 'b'.repeat(64), token = 'c'.repeat(64);
 const origin = 'http://100.112.207.92:8787';
 test('direct registration only accepts bounded, versioned Tailnet QR and strong credentials', () => {
@@ -33,4 +33,11 @@ test('viewer credentials remain out of URLs; requests carry no browser cookies',
     return { ok: true, json: async () => ({ ready: true }) };
   });
   await assert.rejects(() => directRequest(origin, '/v1/status', { token }, async () => ({ ok: false, status: 401, json: async () => ({ error: '등록 해제' }) })), (error) => error.status === 401);
+});
+test('Tailnet IPv6 is accepted without widening media access to LAN, other ULA or public IPv6', () => {
+  for (const ip of ['fd7a:115c:a1e0::1', 'FD7A:115C:A1E0:0000:0000:0000:0000:0001', 'fd7a:115c:a1e0:12:34:56:78:90']) assert.equal(isTailnetMedia(ip), true, ip);
+  for (const ip of ['fd7a:115c:a1e1::1', 'fd7a:115c:a1e0:1:2', 'fd7a:115c:a1e0::1::2', 'fd7a:115c:a1e0::1%tun0', 'fd7a:115c:a1e0::zz', 'fd7a:115c:a1e0:1:2:3:4:5:6', '2001:4860:4860::8888', 'fe80::1', '192.168.0.1']) assert.equal(isTailnetMedia(ip), false, ip);
+  const sdp = 'v=0\r\na=candidate:1 1 udp 100 fd7a:115c:a1e0::1 5555 typ host\r\na=candidate:2 1 udp 100 2001:4860:4860::8888 5556 typ host\r\n';
+  assert.match(tailnetSdp(sdp), /fd7a:115c:a1e0::1/);
+  assert.doesNotMatch(tailnetSdp(sdp), /2001:4860/);
 });

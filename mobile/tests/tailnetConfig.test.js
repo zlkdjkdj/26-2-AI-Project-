@@ -10,6 +10,11 @@ test('VPN collection is enabled before React creates the WebRTC module and appli
   assert.match(updated, /requestVPN:true/);
   assert.match(updated, /getAllNetworksFromCache:false/);
   assert.match(updated, /WebRTC-NetworkMonitorAutoDetect\//);
+  assert.ok(updated.indexOf('disableNetworkMonitor = true') < updated.indexOf('loadReactNative(this)'));
+  assert.match(updated, /disableEncryption = false/);
+  assert.match(updated, /networkIgnoreMask = org\.webrtc\.PeerConnectionFactory.Options.ADAPTER_TYPE_LOOPBACK/);
+  const legacy = updated.slice(0, updated.indexOf('// atchacha: let OS routing')) + 'loadReactNative(this)\n}';
+  assert.match(configureApplication(legacy), /disableNetworkMonitor = true/);
   assert.equal(configureApplication(updated), updated);
   assert.throws(() => configureApplication('unsupported template'));
 });

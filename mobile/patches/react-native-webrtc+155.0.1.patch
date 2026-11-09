@@ -1,0 +1,32 @@
+diff --git a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModule.java b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModule.java
+index d3bfe07..929f160 100644
+--- a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModule.java
++++ b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModule.java
+@@ -105,6 +105,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
+         Log.d(TAG, "Using video decoder factory: " + decoderFactory.getClass().getCanonicalName());
+ 
+         mFactory = PeerConnectionFactory.builder()
++                           .setOptions(options.peerConnectionFactoryOptions)
+                            .setAudioDeviceModule(adm)
+                            .setVideoEncoderFactory(encoderFactory)
+                            .setVideoDecoderFactory(decoderFactory)
+diff --git a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java
+index 01d31d7..f30221c 100644
+--- a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java
++++ b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCModuleOptions.java
+@@ -1,6 +1,7 @@
+ package com.oney.WebRTCModule;
+ 
+ import org.webrtc.Loggable;
++import org.webrtc.PeerConnectionFactory;
+ import org.webrtc.Logging;
+ import org.webrtc.VideoDecoderFactory;
+ import org.webrtc.VideoEncoderFactory;
+@@ -15,6 +16,7 @@ public class WebRTCModuleOptions {
+     public Loggable injectableLogger;
+     public Logging.Severity loggingSeverity;
+     public String fieldTrials;
++    public PeerConnectionFactory.Options peerConnectionFactoryOptions;
+     public boolean enableMediaProjectionService;
+ 
+     public static WebRTCModuleOptions getInstance() {

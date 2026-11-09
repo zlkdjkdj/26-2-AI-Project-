@@ -3,12 +3,16 @@ import { AppState, StyleSheet, Text, View } from 'react-native';
 import { MediaStream, RTCView, RTCPeerConnection, mediaDevices } from 'react-native-webrtc';
 import { useKeepAwake } from 'expo-keep-awake';
 import Bridge from '../modules/homecam-bridge';
-import { directRequest, tailnetSdp } from './directProtocol';
+import { directRequest, hasTailnetCandidate, tailnetSdp } from './directProtocol';
 import { excludeUnsupportedAv1 } from './videoCodecs';
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function description(peer) {
-  for (let i = 0; i < 100 && peer.iceGatheringState !== 'complete'; i++) await pause(100);
+  for (let i = 0; i < 100; i++) {
+    if (peer.connectionState === 'closed') throw new Error('영상 연결이 종료되었습니다.');
+    if (peer.iceGatheringState === 'complete' && hasTailnetCandidate(peer.localDescription?.sdp || '')) break;
+    await pause(100);
+  }
   const network = await Bridge.networkStatus();
   return tailnetSdp(peer.localDescription.sdp, network);
 }
@@ -48,7 +52,7 @@ export default function DirectVideo({ camera, connection, fit = 'contain', onSto
           if (offerId) { closePeer(); offerId = ''; update('모니터링 기기 연결 대기 중'); }
         } else if (offer.id !== offerId) {
           closePeer();
-          const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all' });
+          const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all', continualGatheringPolicy: 'gather_continually' });
           peer = current; offerId = offer.id;
           attach(current);
           media.getTracks().forEach((track) => current.addTrack(track, media));
@@ -80,7 +84,7 @@ export default function DirectVideo({ camera, connection, fit = 'contain', onSto
         if (!active || attempt !== generation) return;
         if (status.id !== connection.id) throw Object.assign(new Error('등록된 공기계가 아닙니다. QR로 다시 등록하세요.'), { status: 401 });
         if (!status.ready) throw new Error('공기계에서 촬영 시작을 눌러 주세요. 자동으로 다시 확인합니다.');
-        const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all' });
+        const current = new RTCPeerConnection({ iceServers: [], candidateNetworkPolicy: 'all', continualGatheringPolicy: 'gather_continually' });
         peer = current;
         attach(current, viewerStart);
         current.addTransceiver('video', { direction: 'recvonly' });

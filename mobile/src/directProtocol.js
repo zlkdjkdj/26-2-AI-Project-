@@ -7,6 +7,19 @@ export function isTailnet(ip) {
   return parts.length === 4 && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)
     && Number(parts[0]) === 100 && Number(parts[1]) >= 64 && Number(parts[1]) <= 127;
 }
+export function isTailnetMedia(ip) {
+  if (isTailnet(ip)) return true;
+  // Tailscale's exact fd7a:115c:a1e0::/48; reject arbitrary ULA, scopes and hosts.
+  if (!/^fd7a:115c:a1e0:/i.test(ip) || !/^[0-9a-f:]+$/i.test(ip)) return false;
+  const halves = ip.split('::');
+  if (halves.length > 2) return false;
+  const groups = halves.flatMap((half) => half ? half.split(':') : []);
+  if (!groups.every((group) => /^[0-9a-f]{1,4}$/i.test(group))) return false;
+  return halves.length === 2 ? groups.length < 8 : groups.length === 8;
+}
+export function hasTailnetCandidate(sdp) {
+  return sdp.split(/\r?\n/).some((line) => line.startsWith('a=candidate:') && isTailnetMedia(line.split(/\s+/)[4] || ''));
+}
 export function directOrigin(value) {
   const url = new URL(value);
   if (url.protocol !== 'http:' || !isTailnet(url.hostname) || url.port !== '8787'
@@ -51,11 +64,12 @@ export async function directRequest(origin, path, { token, json, method, signal 
 // Restrict media candidates to the encrypted Tailnet, with no public STUN/TURN dependency.
 export function tailnetSdp(sdp, network) {
   const lines = sdp.split(/\r?\n/);
-  const candidates = lines.filter((line) => line.startsWith('a=candidate:') && isTailnet(line.split(/\s+/)[4] || ''));
+  const candidates = lines.filter((line) => line.startsWith('a=candidate:') && isTailnetMedia(line.split(/\s+/)[4] || ''));
   if (!candidates.length) {
     if (network?.tailnetInterface === false) throw new Error('이 휴대폰의 Tailscale 연결이 꺼져 있습니다. Tailscale 연결 후 다시 시도하세요.');
-    const count = lines.filter((line) => line.startsWith('a=candidate:')).length;
-    const diagnostic = network ? `T${Number(network.tailnetInterface)}/V${Number(network.vpnNetwork)}/C${count}` : `C${count}`;
+    const addresses = lines.filter((line) => line.startsWith('a=candidate:')).map((line) => line.split(/\s+/)[4] || '');
+    const families = `/I4${addresses.filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip)).length}/I6${addresses.filter((ip) => ip.includes(':')).length}`;
+    const diagnostic = (network ? `T${Number(network.tailnetInterface)}/V${Number(network.vpnNetwork)}/C${addresses.length}` : `C${addresses.length}`) + families;
     throw new Error(`Tailscale 영상 경로 수집에 실패했습니다. 두 휴대폰의 앱을 업데이트한 뒤 완전히 종료하고 다시 실행하세요. [${diagnostic}]`);
   }
   return lines.filter((line) => !line.startsWith('a=candidate:') || candidates.includes(line)).join('\r\n');

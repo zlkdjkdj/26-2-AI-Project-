@@ -67,3 +67,19 @@ Kotlin socket 테스트 4개는 모두 통과했습니다. 현재 WebRTC Android
 1.1.1/versionCode 4의 ARM64/ARM32 release APK 빌드, 내장 번들·컴파일된 VPN 옵션·서명 검증을 완료했습니다. JavaScript 10개와 Kotlin socket 4개, lint/typecheck가 통과했습니다. 연결 복구 여부는 사용자 두 휴대폰에서 업데이트 후 확인하는 단계입니다.
 
 근거: [WebRTC VPN 수집 구현](https://webrtc.googlesource.com/src/+/refs/heads/main/sdk/android/api/org/webrtc/NetworkMonitorAutoDetect.java), [Android 네트워크 UID 수집 API](https://developer.android.com/reference/android/net/NetworkRequest.Builder#setIncludeOtherUidNetworks(boolean)).
+
+## 1.1.2 OS 네트워크 조회와 Tailnet IPv6
+
+1.1.1 실기기에서도 `T1/V1/C8`이 보고되어 연결 복구가 확인되지 않았습니다. 인터페이스와 VPN은 보이나 IPv4 전용 필터가 허용하는 후보가 없다는 뜻이며, 이 코드만으로 후보의 실제 주소나 주소 종류를 확정할 수는 없습니다.
+
+1.1.2는 `PeerConnectionFactory.Options.disableNetworkMonitor=true`로 WebRTC의 Android 네트워크 감시·소켓 바인딩 대신 OS 인터페이스 조회/폴링과 라우팅을 사용합니다. 네트워크 제외 마스크는 loopback만 설정하며 `disableEncryption=false`를 명시합니다. 이 옵션은 Tailscale이나 영상 암호화를 끄는 설정이 아닙니다.
+
+RN WebRTC 155.0.1이 해당 factory 옵션을 노출하지 않아 `patches/react-native-webrtc+155.0.1.patch`에서 옵션 필드와 builder 연결을 추가합니다. `npm install`/`npm ci`의 postinstall이 patch-package로 적용하며 실패하면 설치도 실패합니다. 모바일 빌드는 devDependencies를 포함해 설치해야 합니다. WebRTC 버전을 바꿀 때 패치를 함께 검토해야 합니다. 원본 build copy의 미패치 의존성에 설치 훅을 적용해 성공하는 것을 확인했습니다.
+
+영상 후보는 기존 `100.64.0.0/10`에 Tailscale 전용 IPv6 `fd7a:115c:a1e0::/48`을 추가합니다. 일반 LAN·임의 ULA·공용 IPv6는 계속 거부하며, HTTP 주소와 QR 등록은 기존 IPv4를 유지합니다. 존재하지 않는 후보를 만들거나 물리 네트워크 주소를 Tailnet 주소로 치환하지 않습니다. 초기 수집 완료 이벤트가 먼저 와도 Tailnet 후보를 기다리고, 실패 시 I4/I6 후보 개수만 추가로 표시합니다.
+
+사용자는 **양쪽 휴대폰을 함께 업데이트**하고 Tailscale 연결 후 앱을 재실행해야 합니다. 실제 영상 복구는 새 APK로 재검수해야 합니다.
+
+1.1.2/versionCode 5 release APK 빌드·서명·ARM64/ARM32 라이브러리·내장 IPv6 필터를 확인했습니다. 컴파일된 초기화 코드에서 `disableNetworkMonitor=true`, `disableEncryption=false`, 제외 마스크=loopback 값을 확인했습니다. 깨끗한 `npm ci`에서 패치 자동 적용, JavaScript 11개·lint/typecheck·Expo 의존성 호환성 검사와 감사가 통과했습니다. Kotlin socket 테스트 4개도 Gradle에서 확인했습니다. 이 검증을 실제 휴대폰의 영상 복구 확인으로 해석하지 않습니다.
+
+근거: [WebRTC factory 네트워크 모니터 옵션](https://webrtc.googlesource.com/src/+/refs/heads/main/api/peer_connection_interface.h), [Tailscale IPv6 범위](https://tailscale.com/docs/concepts/ipv6).
