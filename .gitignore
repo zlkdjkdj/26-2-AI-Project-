@@ -106,3 +106,4 @@ Thumbs.db
 
 # Clean Windows environment for the secured demonstration runtime.
 .venv-secure/
+.venv-homecam/

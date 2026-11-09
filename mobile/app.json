@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "앗차차 홈캠",
+    "slug": "atchacha-homecam",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.atchacha.homecam",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#edf3e9",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "versionCode": 3
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "홈캠 영상 전송과 기기 QR 등록에 카메라 권한이 필요합니다.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-status-bar",
+      "@config-plugins/react-native-webrtc",
+      "./plugins/withShortCmakePaths.cjs",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "compileSdkVersion": 37,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "37.0.0"
+          }
+        }
+      ],
+      "expo-router",
+      "./plugins/withStandaloneBundle.cjs"
+    ],
+    "scheme": "atchacha"
+  }
+}

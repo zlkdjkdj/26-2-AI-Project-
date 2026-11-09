@@ -1,0 +1,11 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'com.atchacha.homecam'
+version = '1.0.0'
+android { namespace 'com.atchacha.homecam.bridge' }
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.json:json:20250517'
+}

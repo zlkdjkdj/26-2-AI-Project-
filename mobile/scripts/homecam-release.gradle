@@ -1,0 +1,9 @@
+// Apply the same maintained rule to an already generated Android project.
+// Fresh prebuilds receive this file through withStandaloneBundle.cjs.
+gradle.projectsEvaluated {
+    def appProject = gradle.rootProject.findProject(':app')
+    if (appProject != null) {
+        appProject.android.buildTypes.release.proguardFile(
+            new File(appProject.rootDir, '../homecam-proguard.pro'))
+    }
+}
