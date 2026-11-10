@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AppState, Linking, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useCameraPermissions } from "expo-camera";
 import * as SecureStore from "expo-secure-store";
 import QRCode from "react-native-qrcode-svg";
+import { Camera, QrCode } from "lucide-react-native";
+import {
+  Page,
+  PageHeader,
+  Section,
+  Notice,
+  Progress,
+  Player,
+  confirmAction,
+} from "../appUi";
+import { usePlayerBack } from "../usePlayerBack";
 import Bridge from "../../modules/homecam-bridge";
 import DirectVideo from "../DirectVideo";
 import { CAMERA_STORAGE } from "../directProtocol";
-import { BackLink, Button, s } from "../ui";
+import { Button, s } from "../ui";
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -17,12 +27,16 @@ export default function CameraScreen() {
   const [seconds, setSeconds] = useState(0);
   const [message, setMessage] = useState("촬영 기기 준비 중…");
   const [streaming, setStreaming] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [prepared, setPrepared] = useState(false);
   const identity = useRef(null);
+  const alive = useRef(true);
   const stop = useCallback(() => setStreaming(false), []);
+  usePlayerBack(streaming, stop);
 
   useEffect(() => {
     let active = true;
+    alive.current = true;
     async function prepare() {
       try {
         const raw = await SecureStore.getItemAsync(CAMERA_STORAGE);
@@ -39,6 +53,7 @@ export default function CameraScreen() {
         await SecureStore.setItemAsync(CAMERA_STORAGE, JSON.stringify(saved));
         if (!active) return;
         identity.current = saved;
+        setPrepared(true);
         const address = await Bridge.start(saved.token, saved.id);
         if (active) {
           setHost(address);
@@ -46,6 +61,8 @@ export default function CameraScreen() {
         } else Bridge.stop();
       } catch (error) {
         if (active) setMessage(error.message);
+      } finally {
+        if (active) setBusy(false);
       }
     }
     prepare();
@@ -57,19 +74,21 @@ export default function CameraScreen() {
     });
     return () => {
       active = false;
+      alive.current = false;
       sub.remove();
       Bridge.stop();
     };
   }, []);
   useEffect(() => {
-    if (!qr) return;
-    const timer = setInterval(
-      () => setSeconds((current) => Math.max(0, current - 1)),
+    if (!qr || seconds <= 0) return;
+    const timer = setTimeout(
+      () => setSeconds((value) => Math.max(0, value - 1)),
       1000,
     );
-    return () => clearInterval(timer);
-  }, [qr]);
+    return () => clearTimeout(timer);
+  }, [qr, seconds]);
   async function restart() {
+    if (!prepared || busy) return;
     setBusy(true);
     setQr(null);
     try {
@@ -77,6 +96,10 @@ export default function CameraScreen() {
         identity.current.token,
         identity.current.id,
       );
+      if (!alive.current) {
+        Bridge.stop();
+        return;
+      }
       setHost(address);
       setMessage("Tailscale 연결을 다시 확인했습니다.");
     } catch (error) {
@@ -87,26 +110,41 @@ export default function CameraScreen() {
     }
   }
   function pairing() {
-    const data = Bridge.newPairing();
-    setSeconds(data.expiresIn);
-    setQr(
-      JSON.stringify({
-        app: "atchacha-direct",
-        version: 1,
-        origin: host.origin,
-        id: identity.current.id,
-        pair: data.pair,
-      }),
-    );
+    if (busy || !host) return;
+    try {
+      const data = Bridge.newPairing();
+      setSeconds(data.expiresIn);
+      setQr(
+        JSON.stringify({
+          app: "atchacha-direct",
+          version: 1,
+          origin: host.origin,
+          id: identity.current.id,
+          pair: data.pair,
+        }),
+      );
+    } catch (error) {
+      setMessage(error.message);
+    }
   }
   async function start() {
-    const allowed = permission?.granted || (await requestPermission()).granted;
-    if (!allowed) {
-      setMessage("기기 설정에서 카메라 권한을 허용해 주세요.");
-      return;
+    if (busy || !host) return;
+    setBusy(true);
+    try {
+      const allowed =
+        permission?.granted || (await requestPermission()).granted;
+      if (!allowed) {
+        setMessage("기기 설정에서 카메라 권한을 허용해 주세요.");
+        return;
+      }
+      if (!alive.current || AppState.currentState !== "active") return;
+      setQr(null);
+      setStreaming(true);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
     }
-    setQr(null);
-    setStreaming(true);
   }
   async function revoke() {
     setBusy(true);
@@ -117,7 +155,12 @@ export default function CameraScreen() {
       await Bridge.stop();
       await SecureStore.setItemAsync(CAMERA_STORAGE, JSON.stringify(next));
       identity.current = next;
+      if (!alive.current) return;
       const address = await Bridge.start(next.token, next.id);
+      if (!alive.current) {
+        Bridge.stop();
+        return;
+      }
       setHost(address);
       setMessage(
         "기존 모니터링 기기의 접근을 해제했습니다. 새 QR로 다시 등록하세요.",
@@ -130,67 +173,104 @@ export default function CameraScreen() {
   }
   if (streaming)
     return (
-      <SafeAreaView style={s.safe}>
+      <Player
+        note="충전기를 연결하고 앱과 화면을 켜 두세요. 화면을 잠그면 전송이 중지됩니다."
+        controls={
+          <Button icon={Camera} onPress={stop}>
+            촬영 중지 · 기기 설정
+          </Button>
+        }
+      >
         <DirectVideo camera onStop={stop} fit="contain" />
-        <View style={s.toolbar}>
-          <Text style={s.text}>충전기를 연결하고 이 화면을 켜 두세요.</Text>
-          <Button onPress={stop}>촬영 중지 · 기기 설정</Button>
-        </View>
-      </SafeAreaView>
+      </Player>
     );
   return (
-    <SafeAreaView style={s.safe}>
-      <ScrollView contentContainerStyle={s.content}>
-        <BackLink onPress={() => router.back()} />
-        <Text style={s.eyebrow}>촬영용 공기계</Text>
-        <Text style={s.title}>우리 집을 담는{"\n"}촬영용 휴대폰</Text>
-        <Text style={s.message}>{message}</Text>
-        {host && (
-          <View style={s.card}>
-            <Text style={s.section}>처음 한 번, QR로 등록</Text>
-            <Text style={s.text}>
-              모니터링 휴대폰에서 ‘새 홈캠 QR 등록’을 누르세요. QR은 2분간 한
-              번만 사용할 수 있습니다.
-            </Text>
-            <Button secondary onPress={pairing}>
-              새 등록 QR 만들기
+    <Page>
+      <PageHeader
+        onBack={() => router.back()}
+        eyebrow="홈캠 · 촬영용 휴대폰"
+        title="우리 집을 담는 촬영용 공기계"
+        description="연결 준비를 확인하고, 처음 한 번 QR로 등록하세요. 준비가 끝나면 촬영을 시작합니다."
+      />
+      <Progress
+        labels={["연결 준비", "QR 등록", "촬영 시작"]}
+        current={host ? 1 : 0}
+      />
+      <Notice loading={busy} tone={!host && !busy ? "error" : "info"}>
+        {busy ? "기기 상태를 확인하고 있어요" : message}
+      </Notice>
+      {host && (
+        <Section
+          icon={QrCode}
+          title="모니터링 기기 등록"
+          subtitle="가지고 다니는 휴대폰의 ‘새 홈캠 QR 등록’으로 읽으세요. 이미 등록했다면 바로 촬영을 시작하면 됩니다."
+        >
+          {qr && seconds > 0 ? (
+            <View
+              style={{
+                alignItems: "center",
+                gap: 16,
+                paddingVertical: 16,
+                backgroundColor: "#fff",
+                borderRadius: 12,
+              }}
+            >
+              <QRCode
+                value={qr}
+                size={208}
+                backgroundColor="#fff"
+                color="#1d1d1f"
+              />
+              <Text style={s.text}>{seconds}초 남음 · 1회 사용</Text>
+              <Button secondary onPress={() => setQr(null)}>
+                QR 닫기
+              </Button>
+            </View>
+          ) : (
+            <Button secondary icon={QrCode} disabled={busy} onPress={pairing}>
+              {qr ? "새 등록 QR 만들기" : "등록 QR 만들기"}
             </Button>
-            {qr && seconds > 0 && (
-              <View
-                style={{ alignItems: "center", gap: 12, paddingVertical: 12 }}
-              >
-                <QRCode
-                  value={qr}
-                  size={208}
-                  backgroundColor="#fff"
-                  color="#22312b"
-                />
-                <Text style={s.text}>
-                  {seconds}초 남음 · 등록 후 QR을 닫아 주세요
-                </Text>
-              </View>
-            )}
-            {qr && seconds === 0 && (
-              <Text style={s.text}>QR이 만료되었습니다. 새 QR을 만드세요.</Text>
-            )}
-            <Button onPress={start} disabled={busy}>
-              촬영 시작
-            </Button>
-          </View>
-        )}
-        <Text style={s.text}>
-          두 기기 모두 같은 Tailscale 계정으로 연결하세요. 등록 이후에는 장소가
-          달라도 볼 수 있습니다. PC·개발 서버는 필요하지 않습니다.
-        </Text>
-        <Button secondary disabled={busy} onPress={restart}>
+          )}
+          {qr && seconds === 0 && (
+            <Notice>QR이 만료됐습니다. 새 QR을 만들어 주세요.</Notice>
+          )}
+          <Button icon={Camera} disabled={busy} onPress={start}>
+            촬영 시작
+          </Button>
+        </Section>
+      )}
+      {permission && !permission.granted && !permission.canAskAgain && (
+        <Button secondary onPress={() => Linking.openSettings()}>
+          카메라 권한 설정 열기
+        </Button>
+      )}
+      <Section
+        title="연결이 안 될 때"
+        subtitle="두 휴대폰에서 같은 계정의 Tailscale을 켜 주세요. 연결을 확인한 뒤 다시 시도할 수 있어요."
+      >
+        <Button secondary disabled={busy || !prepared} onPress={restart}>
           Tailscale 연결 다시 확인
         </Button>
-        {host && (
-          <Button danger disabled={busy} onPress={revoke}>
-            등록된 모니터링 기기 모두 해제
-          </Button>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      </Section>
+      <Text style={s.footnote}>
+        등록 후에는 장소가 달라도 볼 수 있습니다. PC는 필요하지 않으며 소리와
+        영상을 저장하지 않습니다.
+      </Text>
+      {host && (
+        <Button
+          danger
+          disabled={busy}
+          onPress={() =>
+            confirmAction(
+              "등록된 기기를 모두 해제할까요?",
+              "기존 모니터링 휴대폰은 영상을 볼 수 없게 됩니다. 새 QR로 다시 등록해야 합니다.",
+              revoke,
+            )
+          }
+        >
+          등록된 모니터링 기기 모두 해제
+        </Button>
+      )}
+    </Page>
   );
 }

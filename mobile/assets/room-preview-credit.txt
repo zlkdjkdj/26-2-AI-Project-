@@ -1,0 +1,3 @@
+Room preview photo: Max Vakhtbovych / Pexels
+Source: https://www.pexels.com/photo/6588599/
+Converted from the existing licensed frontend/public/interior/natural.webp to JPEG for the native preview. Used as a service illustration, not an analysis result or a live camera feed.

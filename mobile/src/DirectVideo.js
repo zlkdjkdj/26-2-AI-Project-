@@ -254,7 +254,7 @@ export default function DirectVideo({
   );
 }
 const styles = StyleSheet.create({
-  video: { flex: 1, backgroundColor: "#18211d", overflow: "hidden" },
+  video: { flex: 1, backgroundColor: "#191b20", overflow: "hidden" },
   status: {
     position: "absolute",
     bottom: 16,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     right: 16,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: "#18211de6",
+    backgroundColor: "#191b20e6",
   },
   text: {
     color: "#fff",

@@ -1,17 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Linking, Text, View } from "react-native";
 import { router } from "expo-router";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as SecureStore from "expo-secure-store";
 import DirectVideo from "../DirectVideo";
+import { Monitor, QrCode } from "lucide-react-native";
+import {
+  Page,
+  PageHeader,
+  Section,
+  Notice,
+  Player,
+  ScanFinder,
+  confirmAction,
+} from "../appUi";
+import { usePlayerBack } from "../usePlayerBack";
 import {
   directRequest,
   parseDirectQr,
   savedCamera,
   VIEWER_STORAGE,
 } from "../directProtocol";
-import { BackLink, Button, s } from "../ui";
+import { Button, s } from "../ui";
 
 export default function ViewerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -25,6 +35,12 @@ export default function ViewerScreen() {
   const lock = useRef(false);
   const alive = useRef(true);
   const stop = useCallback(() => setWatching(false), []);
+  const closeScan = useCallback(() => setScanning(false), []);
+  const closeActive = useCallback(() => {
+    setWatching(false);
+    setScanning(false);
+  }, []);
+  usePlayerBack(watching || scanning, closeActive);
   useEffect(() => {
     alive.current = true;
     SecureStore.getItemAsync(VIEWER_STORAGE)
@@ -43,14 +59,23 @@ export default function ViewerScreen() {
     };
   }, []);
   async function scan() {
-    const allowed = permission?.granted || (await requestPermission()).granted;
-    if (!allowed) {
-      setMessage("QR 등록을 위해 카메라 권한이 필요합니다.");
-      return;
+    if (!loaded || busy) return;
+    setBusy(true);
+    try {
+      const allowed =
+        permission?.granted || (await requestPermission()).granted;
+      if (!allowed) {
+        setMessage("QR 등록을 위해 카메라 권한이 필요합니다.");
+        return;
+      }
+      lock.current = false;
+      setScanning(true);
+      setMessage("");
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
     }
-    lock.current = false;
-    setScanning(true);
-    setMessage("");
   }
   async function read({ data }) {
     if (lock.current) return;
@@ -79,84 +104,136 @@ export default function ViewerScreen() {
     }
   }
   async function forget() {
-    await SecureStore.deleteItemAsync(VIEWER_STORAGE);
-    setConnection(null);
-    setMessage(
-      "이 휴대폰의 등록 정보를 삭제했습니다. 접근 권한 자체를 해제하려면 공기계에서도 기기 해제를 눌러 주세요.",
-    );
+    setBusy(true);
+    try {
+      await SecureStore.deleteItemAsync(VIEWER_STORAGE);
+      setConnection(null);
+      setMessage(
+        "이 휴대폰의 등록 정보를 삭제했습니다. 접근 권한을 해제하려면 공기계에서도 기기 해제를 눌러 주세요.",
+      );
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
   }
   if (watching)
     return (
-      <SafeAreaView style={s.safe}>
+      <Player
+        note={
+          fit === "cover"
+            ? "화면을 가득 채우는 중입니다. 영상 가장자리가 잘릴 수 있어요."
+            : "전체 영상이 보이는 원본 비율입니다."
+        }
+        controls={
+          <View style={s.row}>
+            <View style={{ flex: 1 }}>
+              <Button
+                secondary
+                onPress={() =>
+                  setFit((value) => (value === "contain" ? "cover" : "contain"))
+                }
+              >
+                {fit === "contain" ? "화면 가득 확대" : "원본 비율"}
+              </Button>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button onPress={stop}>영상 닫기</Button>
+            </View>
+          </View>
+        }
+      >
         <DirectVideo
           camera={false}
           connection={connection}
           fit={fit}
           onStop={stop}
         />
-        <View style={s.toolbar}>
-          <Button
-            secondary
-            onPress={() =>
-              setFit((value) => (value === "contain" ? "cover" : "contain"))
-            }
-          >
-            {fit === "contain" ? "화면 가득 확대" : "원본 비율로 보기"}
-          </Button>
-          <Button onPress={stop}>영상 닫기</Button>
-        </View>
-      </SafeAreaView>
+      </Player>
     );
   if (scanning)
     return (
-      <SafeAreaView style={s.safe}>
+      <Player controls={<Button onPress={closeScan}>스캔 취소</Button>}>
         <CameraView
           style={{ flex: 1 }}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={read}
         />
-        <View style={s.toolbar}>
-          <Text style={s.text}>공기계의 등록 QR을 화면에 맞춰 주세요.</Text>
-          <Button onPress={() => setScanning(false)}>스캔 취소</Button>
-        </View>
-      </SafeAreaView>
+        <ScanFinder />
+      </Player>
     );
   return (
-    <SafeAreaView style={s.safe}>
-      <ScrollView contentContainerStyle={s.content}>
-        <BackLink onPress={() => router.back()} />
-        <Text style={s.eyebrow}>모니터링 휴대폰</Text>
-        <Text style={s.title}>떨어져 있어도,{"\n"}바로 확인하세요</Text>
-        <Text style={s.text}>
-          Tailscale을 켜면 모바일 데이터나 다른 Wi-Fi에서도 등록한 공기계의
-          영상을 볼 수 있습니다.
-        </Text>
-        {message ? <Text style={s.message}>{message}</Text> : null}
-        {connection && (
-          <View style={s.card}>
-            <Text style={s.section}>등록된 우리집 홈캠</Text>
-            <Text style={s.text}>
-              공기계에서 촬영 중인지 확인하세요. 영상은 이 화면에서만
-              재생됩니다.
-            </Text>
-            <Button disabled={busy} onPress={() => setWatching(true)}>
-              실시간 영상 보기
-            </Button>
-          </View>
-        )}
-        <Button secondary disabled={!loaded || busy} onPress={scan}>
-          {busy ? "기기 등록 중…" : "새 홈캠 QR 등록"}
-        </Button>
-        {connection && (
-          <Button secondary disabled={busy} onPress={forget}>
-            이 휴대폰의 등록 정보 삭제
+    <Page>
+      <PageHeader
+        onBack={() => router.back()}
+        eyebrow="홈캠 · 모니터링 휴대폰"
+        title="떨어져 있어도 바로 확인하세요"
+        description="등록된 홈캠을 열거나, 공기계의 QR을 처음 한 번 읽어 연결하세요."
+      />
+      {!loaded && <Notice loading>등록한 기기를 확인하고 있어요</Notice>}
+      {message ? <Notice>{message}</Notice> : null}
+      {connection ? (
+        <Section
+          dark
+          icon={Monitor}
+          title="등록된 우리 집 홈캠"
+          subtitle="등록 정보가 저장돼 있습니다. 공기계에서 촬영을 시작한 뒤 영상을 열어 주세요."
+        >
+          <Button
+            disabled={!loaded || busy}
+            icon={Monitor}
+            onPress={() => setWatching(true)}
+          >
+            실시간 영상 보기
           </Button>
-        )}
-        <Text style={s.text}>
-          QR 등록은 두 휴대폰이 함께 있을 때 한 번만 진행하세요. 계정 가입·PC
-          서버 주소 입력 없이 연결됩니다.
-        </Text>
-      </ScrollView>
-    </SafeAreaView>
+        </Section>
+      ) : (
+        loaded && (
+          <Section
+            icon={QrCode}
+            title="첫 홈캠을 등록해 볼까요"
+            subtitle="촬영용 공기계에서 ‘등록 QR 만들기’를 누르고, 이 휴대폰으로 읽어 주세요."
+          >
+            <Button icon={QrCode} disabled={busy} onPress={scan}>
+              {busy ? "기기 등록 중…" : "새 홈캠 QR 등록"}
+            </Button>
+          </Section>
+        )
+      )}
+      {connection && (
+        <Button
+          secondary
+          icon={QrCode}
+          disabled={!loaded || busy}
+          onPress={scan}
+        >
+          새 홈캠 QR 등록
+        </Button>
+      )}
+      {permission && !permission.granted && !permission.canAskAgain && (
+        <Button secondary onPress={() => Linking.openSettings()}>
+          QR 카메라 권한 설정
+        </Button>
+      )}
+      <Text style={s.footnote}>
+        두 기기 모두 Tailscale을 켜 주세요. 등록 이후에는 모바일 데이터나 다른
+        Wi-Fi에서도 볼 수 있습니다. 앱과 화면을 켜 둔 동안 영상이 전송됩니다.
+      </Text>
+      {connection && (
+        <Button
+          danger
+          disabled={busy}
+          onPress={() =>
+            confirmAction(
+              "이 휴대폰의 등록을 지울까요?",
+              "다시 보려면 공기계의 QR을 새로 읽어야 합니다. 공기계의 접근 권한 자체는 공기계에서 해제할 수 있습니다.",
+              forget,
+            )
+          }
+        >
+          이 휴대폰의 등록 정보 삭제
+        </Button>
+      )}
+    </Page>
   );
 }

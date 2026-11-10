@@ -32,7 +32,7 @@ function Button({ children, onPress, secondary, disabled }) {
         (disabled || pressed) && { opacity: 0.55 },
       ]}
     >
-      <Text style={[styles.buttonText, secondary && { color: "#31543e" }]}>
+      <Text style={[styles.buttonText, secondary && { color: "#1d1d1f" }]}>
         {children}
       </Text>
     </Pressable>
@@ -419,13 +419,13 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     overflow: "hidden",
     borderRadius: 12,
-    backgroundColor: "#18211d",
+    backgroundColor: "#191b20",
   },
   qrPreview: {
     height: 280,
     borderRadius: 8,
     overflow: "hidden",
-    backgroundColor: "#18211d",
+    backgroundColor: "#191b20",
   },
   placeholder: {
     flex: 1,
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 16,
     left: 16,
-    backgroundColor: "#18211de6",
+    backgroundColor: "#191b20e6",
     padding: 12,
     borderRadius: 4,
   },

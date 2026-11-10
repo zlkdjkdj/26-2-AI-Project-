@@ -1,15 +1,16 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowLeft, ScanLine } from "lucide-react-native";
 export const colors = {
-  page: "#f7f8f5",
+  page: "#f5f5f7",
   surface: "#ffffff",
-  raised: "#eef1ec",
-  ink: "#22312b",
-  secondary: "#56635c",
-  muted: "#6b756e",
-  line: "#dce2dc",
-  accent: "#255345",
-  accentSoft: "#eaf0e8",
+  raised: "#ededf0",
+  ink: "#1d1d1f",
+  secondary: "#515154",
+  muted: "#6e6e73",
+  line: "#e5e5e7",
+  accent: "#0071e3",
+  link: "#0066cc",
+  accentSoft: "#eaf3ff",
   danger: "#92392e",
 };
 export const fonts = {
@@ -35,20 +36,21 @@ export function Button({
         s.button,
         secondary && s.secondary,
         danger && s.danger,
-        (pressed || disabled) && { opacity: 0.5 },
+        pressed && !disabled && { transform: [{ scale: 0.97 }], opacity: 0.85 },
+        disabled && { opacity: 0.5 },
       ]}
     >
       {Icon && (
         <Icon
           size={18}
           strokeWidth={1.5}
-          color={danger ? colors.danger : secondary ? colors.accent : "#fff"}
+          color={danger ? colors.danger : secondary ? colors.link : "#fff"}
         />
       )}
       <Text
         style={[
           s.buttonText,
-          secondary && { color: colors.accent },
+          secondary && { color: colors.link },
           danger && { color: colors.danger },
         ]}
       >
@@ -60,7 +62,7 @@ export function Button({
 export function Brand() {
   return (
     <View style={s.brandRow}>
-      <ScanLine size={28} color={colors.accent} strokeWidth={1.5} />
+      <ScanLine size={28} color={colors.ink} strokeWidth={1.5} />
       <Text style={s.brand}>앗차차</Text>
     </View>
   );
@@ -69,7 +71,7 @@ export function BackLink({ onPress }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={s.back}>
       <ArrowLeft size={18} color={colors.secondary} strokeWidth={1.5} />
-      <Text style={s.backText}>홈으로</Text>
+      <Text style={s.backText}>이전으로</Text>
     </Pressable>
   );
 }
@@ -83,7 +85,7 @@ export const s = StyleSheet.create({
     marginBottom: 12,
   },
   brand: { color: colors.ink, fontSize: 24, fontFamily: fonts.semibold },
-  eyebrow: { color: colors.accent, fontSize: 13, fontFamily: fonts.medium },
+  eyebrow: { color: colors.link, fontSize: 13, fontFamily: fonts.medium },
   title: {
     color: colors.ink,
     fontSize: 32,

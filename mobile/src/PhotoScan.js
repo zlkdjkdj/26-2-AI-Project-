@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,13 +10,17 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import * as ImagePicker from "expo-image-picker";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import { serverAddress } from "./api";
 import { scoreMessage } from "./scanFeedback";
-import { BackLink, colors as c, fonts as f } from "./ui";
+import { colors as c, fonts as f } from "./ui";
+import { Enter, PageHeader, Progress, Notice } from "./appUi";
+import { PHOTO_SERVER_STORAGE } from "./photoConnection";
+import { useReducedMotion } from "./introMotion";
 
 const targets = {
   elderly: "노약자",
@@ -36,16 +41,21 @@ const rooms = {
 };
 const levels = { HIGH: "고위험", MEDIUM: "중위험", LOW: "저위험" };
 
-function Choice({ items, value, onChange }) {
+function Choice({ items, value, onChange, disabled = false }) {
   return (
     <View style={s.choices}>
       {Object.entries(items).map(([key, label]) => (
         <Pressable
           key={key}
           accessibilityRole="button"
-          accessibilityState={{ selected: value === key }}
+          accessibilityState={{ selected: value === key, disabled }}
+          disabled={disabled}
           onPress={() => onChange(key)}
-          style={[s.chip, value === key && s.selected]}
+          style={[
+            s.chip,
+            value === key && s.selected,
+            disabled && { opacity: 0.6 },
+          ]}
         >
           <Text style={[s.chipText, value === key && s.selectedText]}>
             {label}
@@ -60,14 +70,16 @@ function Button({ title, onPress, disabled, secondary }) {
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
+      accessibilityState={{ disabled: !!disabled }}
       onPress={onPress}
-      style={[
+      style={({ pressed }) => [
         s.button,
         secondary && s.secondary,
         disabled && { opacity: 0.45 },
+        pressed && !disabled && { opacity: 0.8, transform: [{ scale: 0.98 }] },
       ]}
     >
-      <Text style={[s.buttonText, secondary && { color: "#255345" }]}>
+      <Text style={[s.buttonText, secondary && { color: "#1d1d1f" }]}>
         {title}
       </Text>
     </Pressable>
@@ -75,6 +87,10 @@ function Button({ title, onPress, disabled, secondary }) {
 }
 
 export default function PhotoScan({ initialServer, onBack }) {
+  const scroll = useRef(null);
+  const recommendationY = useRef(0);
+  const reduced = useReducedMotion();
+  const [selectedHazard, setSelectedHazard] = useState(0);
   const [server, setServer] = useState(initialServer || "");
   const [code, setCode] = useState("");
   const [csrf, setCsrf] = useState(null);
@@ -133,6 +149,10 @@ export default function PhotoScan({ initialServer, onBack }) {
       });
       setCsrf(data.csrf_token);
       setCode("");
+      SecureStore.setItemAsync(
+        PHOTO_SERVER_STORAGE,
+        serverAddress(server),
+      ).catch(() => {});
     } catch (e) {
       setError(e.message);
     } finally {
@@ -169,6 +189,7 @@ export default function PhotoScan({ initialServer, onBack }) {
   }
   async function analyze() {
     if (!photo || busy) return;
+    setSelectedHazard(0);
     setBusy(true);
     setError("");
     try {
@@ -195,7 +216,10 @@ export default function PhotoScan({ initialServer, onBack }) {
   useEffect(() => {
     if (!result?.explanation_pending) return;
     let active = true;
+    let pending = false;
     const id = setInterval(async () => {
+      if (pending) return;
+      pending = true;
       try {
         const data = await jsonRequest(`/api/scans/${result.scan_id}`);
         if (active)
@@ -208,179 +232,352 @@ export default function PhotoScan({ initialServer, onBack }) {
                 }
               : old,
           );
-      } catch {}
+      } catch {
+      } finally {
+        pending = false;
+      }
     }, 3000);
     return () => {
       active = false;
       clearInterval(id);
     };
   }, [jsonRequest, result?.scan_id, result?.explanation_pending]);
+  useEffect(() => {
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [result?.scan_id]);
+  const showResult = !!csrf && !!result;
+  const hazards = result?.hazards || [];
+  const selected = hazards[selectedHazard];
+  function chooseHazard(index) {
+    setSelectedHazard(index);
+    scroll.current?.scrollTo({
+      y: Math.max(0, recommendationY.current - 16),
+      animated: !reduced,
+    });
+  }
   return (
-    <ScrollView
-      contentContainerStyle={s.page}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <BackLink onPress={onBack} />
-      <Text style={s.eyebrow}>사진 안전점검</Text>
-      <Text style={s.title}>
-        사진으로 살피는
-        {"\n"}
-        우리 공간의 안전
-      </Text>
-      {!csrf ? (
-        <View style={s.card}>
-          <Text style={s.heading}>사진점검 잠금 해제</Text>
-          <Text style={s.note}>
-            홈캠 연결 코드가 아닌 기존 시연 코드를 입력하세요.
-          </Text>
-          <TextInput
-            style={s.input}
-            value={server}
-            onChangeText={setServer}
-            autoCapitalize="none"
-            keyboardType="url"
-            placeholder="PC 서버 주소 (예: http://100.x.x.x:8000)"
+      <ScrollView
+        ref={scroll}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <Enter style={s.page}>
+          <PageHeader
+            onBack={onBack}
+            eyebrow="사진 안전점검"
+            title={
+              showResult
+                ? "이곳부터 살펴보세요"
+                : "사진으로 살피는 우리 공간의 안전"
+            }
+            description={
+              showResult
+                ? "사진의 표시와 목록에서 물건별 권고를 확인하세요. 점수는 사진 확인 항목에 한정한 참고값입니다."
+                : "가구와 바닥, 이동 통로가 함께 보이도록 촬영해 주세요."
+            }
           />
-          <TextInput
-            style={s.input}
-            value={code}
-            onChangeText={setCode}
-            secureTextEntry
-            placeholder="시연 코드"
-            autoCapitalize="none"
+          <Progress
+            labels={["잠금 해제", "사진 점검", "결과 확인"]}
+            current={!csrf ? 0 : showResult ? 2 : 1}
           />
-          <Button
-            title="잠금 해제"
-            onPress={unlock}
-            disabled={busy || !server || !code}
-          />
-        </View>
-      ) : (
-        <>
-          <View style={s.card}>
-            <Text style={s.heading}>1. 공간 사진</Text>
-            <View style={s.row}>
-              <Button
-                secondary
-                title="카메라 촬영"
-                onPress={() => selectPhoto(true)}
-                disabled={busy}
+          {!!error && <Notice tone="error">{error}</Notice>}
+          {!csrf ? (
+            <View style={s.card}>
+              <Text style={s.heading}>사진점검 잠금 해제</Text>
+              <Text style={s.note}>
+                개인 PC 서버 주소와 기존 시연 코드를 입력하세요. 홈캠 QR
+                연결과는 별개입니다.
+              </Text>
+              <Text style={s.label}>PC 서버 주소</Text>
+              <TextInput
+                accessibilityLabel="사진 분석 PC 서버 주소"
+                style={s.input}
+                value={server}
+                onChangeText={setServer}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                placeholder="http://100.x.x.x:8000"
+                editable={!busy}
+              />
+              <Text style={s.label}>시연 코드</Text>
+              <TextInput
+                accessibilityLabel="사진 점검 시연 코드"
+                style={s.input}
+                value={code}
+                onChangeText={setCode}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="기존 시연 코드"
+                editable={!busy}
               />
               <Button
-                secondary
-                title="앨범에서 선택"
-                onPress={() => selectPhoto(false)}
-                disabled={busy}
+                title={busy ? "연결 확인 중…" : "잠금 해제"}
+                onPress={unlock}
+                disabled={busy || !server.trim() || !code.trim()}
               />
+              <Text style={s.note}>
+                서버 주소만 이 기기에 기억합니다. 시연 코드와 CSRF 토큰은
+                저장하지 않습니다.
+              </Text>
             </View>
-            {photo && (
+          ) : !showResult ? (
+            <>
+              <View style={s.card}>
+                <Text style={s.heading}>공간 사진</Text>
+                {photo ? (
+                  <PhotoPreview photo={photo} />
+                ) : (
+                  <View style={s.photoEmpty}>
+                    <Text style={s.heading}>
+                      우리 공간의 지금 모습을 담아주세요
+                    </Text>
+                    <Text style={s.note}>가구 · 바닥 · 이동 통로</Text>
+                  </View>
+                )}
+                <View style={s.row}>
+                  <Button
+                    secondary
+                    title="카메라 촬영"
+                    onPress={() => selectPhoto(true)}
+                    disabled={busy}
+                  />
+                  <Button
+                    secondary
+                    title="앨범에서 선택"
+                    onPress={() => selectPhoto(false)}
+                    disabled={busy}
+                  />
+                </View>
+              </View>
+              <View style={s.card}>
+                <Text style={s.heading}>누구와 어떤 공간인가요?</Text>
+                <Text style={s.label}>사용 대상</Text>
+                <Choice
+                  items={targets}
+                  value={target}
+                  onChange={setTarget}
+                  disabled={busy}
+                />
+                <Text style={s.label}>공간</Text>
+                <Choice
+                  items={rooms}
+                  value={room}
+                  onChange={setRoom}
+                  disabled={busy}
+                />
+                <Button
+                  title={busy ? "사진을 분석하고 있어요…" : "안전점검 시작"}
+                  onPress={analyze}
+                  disabled={!photo || busy}
+                />
+                {busy && (
+                  <Notice loading>
+                    탐지 결과를 준비하고 있어요. 완료되면 결과 화면으로
+                    이동합니다.
+                  </Notice>
+                )}
+                <Text style={s.note}>
+                  점검 사진은 서버에 보관하지 않습니다. 분석 결과는 기존 보관
+                  설정을 따릅니다.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={s.scoreCard}>
+                <Text style={s.label}>참고 안전점수</Text>
+                <Text style={s.score}>
+                  {result.score_computable === false
+                    ? "점수 산정 보류"
+                    : `${result.safety_score}점`}
+                </Text>
+                <Text style={s.body}>{scoreMessage(result)}</Text>
+                <Text style={s.note}>
+                  탐지된 물건 {result.detected_objects?.length || 0}개 · 위험
+                  확인 항목 {hazards.length}개
+                </Text>
+              </View>
+              {photo && (
+                <PhotoPreview
+                  photo={photo}
+                  hazards={hazards}
+                  selected={selectedHazard}
+                  onSelect={chooseHazard}
+                />
+              )}
+              <Text style={s.note}>{result.notice}</Text>
+              {!!hazards.length && (
+                <View style={s.choices}>
+                  {hazards.map((h, i) => (
+                    <Pressable
+                      key={h.id || i}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: selectedHazard === i }}
+                      onPress={() => setSelectedHazard(i)}
+                      style={[s.chip, selectedHazard === i && s.selected]}
+                    >
+                      <Text
+                        style={[
+                          s.chipText,
+                          selectedHazard === i && s.selectedText,
+                        ]}
+                      >
+                        {i + 1}. {h.instance_label || h.object_label} ·{" "}
+                        {levels[h.risk_level] || h.risk_level}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
               <View
-                style={{
-                  width: "100%",
-                  aspectRatio: photo.width / photo.height,
-                  backgroundColor: "#e5ebe5",
-                  borderRadius: 12,
-                  overflow: "hidden",
+                style={s.card}
+                onLayout={(event) => {
+                  recommendationY.current = event.nativeEvent.layout.y;
                 }}
               >
-                <Image
-                  source={{ uri: photo.uri }}
-                  style={StyleSheet.absoluteFill}
-                  resizeMode="stretch"
-                />
-                {result?.hazards?.map(
-                  (h, i) =>
-                    h.bbox?.length === 4 && (
-                      <View
-                        key={h.id || i}
-                        style={{
-                          position: "absolute",
-                          left: `${h.bbox[0] * 100}%`,
-                          top: `${h.bbox[1] * 100}%`,
-                          width: `${h.bbox[2] * 100}%`,
-                          height: `${h.bbox[3] * 100}%`,
-                          borderWidth: 2,
-                          borderColor:
-                            h.risk_level === "HIGH" ? "#a23d30" : "#8a5b16",
-                        }}
-                      >
-                        <Text style={s.marker}>{i + 1}</Text>
-                      </View>
-                    ),
+                {selected ? (
+                  <>
+                    <Text style={s.eyebrow}>
+                      {selectedHazard + 1} / {hazards.length} ·{" "}
+                      {levels[selected.risk_level] || selected.risk_level}
+                    </Text>
+                    <Text style={s.hazardTitle}>
+                      {selected.instance_label || selected.object_label}
+                    </Text>
+                    <Text style={s.body}>{selected.description}</Text>
+                    {!!selected.accident && (
+                      <Text style={s.body}>{selected.accident}</Text>
+                    )}
+                    <Text style={s.label}>먼저 확인할 권고</Text>
+                    <Text style={s.advice}>{selected.recommendation}</Text>
+                    {!!selected.supplement && (
+                      <Text style={s.body}>{selected.supplement}</Text>
+                    )}
+                    {!!selected.placement_advice && (
+                      <Text style={s.body}>{selected.placement_advice}</Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={s.body}>
+                    사진에서 위험 후보가 발견되지 않았습니다. 탐지되지 않은 곳도
+                    현장 확인이 필요합니다.
+                  </Text>
                 )}
               </View>
-            )}
-          </View>
-          <View style={s.card}>
-            <Text style={s.heading}>2. 누구와 어떤 공간인가요?</Text>
-            <Text style={s.label}>사용 대상</Text>
-            <Choice items={targets} value={target} onChange={setTarget} />
-            <Text style={s.label}>공간</Text>
-            <Choice items={rooms} value={room} onChange={setRoom} />
-            <Button
-              title={busy ? "사진을 분석하고 있어요…" : "안전점검 시작"}
-              onPress={analyze}
-              disabled={!photo || busy}
-            />
-            {busy && <ActivityIndicator color="#255345" />}
-          </View>
-          {result && (
-            <View style={s.card}>
-              <Text style={s.eyebrow}>사진 피드백</Text>
-              <Text style={s.score}>
-                {result.score_computable === false
-                  ? "점수 산정 불가"
-                  : `${result.safety_score}점`}
-              </Text>
-              <Text style={s.body}>{scoreMessage(result)}</Text>
-              <Text style={s.note}>
-                탐지된 물건 {result.detected_objects?.length || 0}개 · 위험 확인
-                항목 {result.hazards?.length || 0}개
-              </Text>
-              <Text style={s.note}>{result.notice}</Text>
-              {result.hazards?.length ? (
-                result.hazards.map((h, i) => (
-                  <View key={h.id || i} style={s.hazard}>
-                    <Text style={s.hazardTitle}>
-                      {i + 1}. {h.instance_label || h.object_label} ·{" "}
-                      {levels[h.risk_level] || h.risk_level}
-                    </Text>
-                    <Text style={s.body}>{h.description}</Text>
-                    {!!h.accident && <Text style={s.body}>{h.accident}</Text>}
-                    <Text style={s.advice}>{h.recommendation}</Text>
-                    {!!h.supplement && (
-                      <Text style={s.body}>{h.supplement}</Text>
-                    )}
-                    {!!h.placement_advice && (
-                      <Text style={s.body}>{h.placement_advice}</Text>
-                    )}
-                  </View>
-                ))
-              ) : (
-                <Text style={s.body}>
-                  사진에서 위험 후보가 발견되지 않았습니다. 현장 확인도
-                  필요합니다.
-                </Text>
+              {!!result.explanation?.summary && (
+                <View style={s.card}>
+                  <Text style={s.heading}>추가 개선 안내</Text>
+                  <Text style={s.body}>{result.explanation.summary}</Text>
+                </View>
               )}
-              <Text style={s.body}>{result.explanation?.summary}</Text>
               {result.explanation_pending && (
-                <Text style={s.note}>추가 설명을 준비하고 있어요.</Text>
+                <Notice loading>
+                  추가 설명을 준비하고 있어요. 사진 피드백은 먼저 확인할 수
+                  있습니다.
+                </Notice>
               )}
-            </View>
+              <Button
+                title="사진·대상 설정으로 돌아가기"
+                secondary
+                onPress={() => {
+                  setResult(null);
+                  setError("");
+                  scroll.current?.scrollTo({ y: 0, animated: false });
+                }}
+              />
+              <Button
+                title="다른 사진으로 점검하기"
+                onPress={() => {
+                  setResult(null);
+                  setPhoto(null);
+                  setError("");
+                  scroll.current?.scrollTo({ y: 0, animated: false });
+                }}
+              />
+            </>
           )}
-        </>
+        </Enter>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+function PhotoPreview({ photo, hazards = [], selected = -1, onSelect }) {
+  return (
+    <View
+      style={{
+        width: "100%",
+        aspectRatio: photo.width / photo.height,
+        backgroundColor: c.raised,
+        borderRadius: 16,
+        overflow: "hidden",
+      }}
+    >
+      <Image
+        source={{ uri: photo.uri }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="stretch"
+      />
+      {hazards.map(
+        (h, i) =>
+          h.bbox?.length === 4 && (
+            <Pressable
+              key={h.id || i}
+              accessibilityRole="button"
+              accessibilityLabel={`${i + 1}. ${h.instance_label || h.object_label} 피드백 보기`}
+              onPress={() => onSelect?.(i)}
+              style={{
+                position: "absolute",
+                left: `${h.bbox[0] * 100}%`,
+                top: `${h.bbox[1] * 100}%`,
+                width: `${h.bbox[2] * 100}%`,
+                height: `${h.bbox[3] * 100}%`,
+                borderWidth: i === selected ? 3 : 2,
+                borderColor: h.risk_level === "HIGH" ? "#a23d30" : "#8a5b16",
+                backgroundColor: i === selected ? "#ffffff16" : "transparent",
+              }}
+            >
+              <Text style={s.marker}>{i + 1}</Text>
+            </Pressable>
+          ),
       )}
-      {!!error && (
-        <Text style={s.error} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  page: { padding: 24, paddingBottom: 48, gap: 20 },
+  page: {
+    padding: 24,
+    paddingBottom: 48,
+    gap: 20,
+    maxWidth: 640,
+    width: "100%",
+    alignSelf: "center",
+  },
+  photoEmpty: {
+    minHeight: 200,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: c.line,
+    borderRadius: 12,
+    padding: 20,
+  },
+  scoreCard: {
+    padding: 24,
+    gap: 16,
+    backgroundColor: c.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.line,
+  },
   eyebrow: { color: c.accent, fontSize: 13, fontFamily: f.medium },
   title: { color: c.ink, fontSize: 32, fontFamily: f.medium, lineHeight: 42 },
   card: {
@@ -451,7 +648,7 @@ const s = StyleSheet.create({
   hazardTitle: {
     color: c.ink,
     fontFamily: f.medium,
-    fontSize: 16,
+    fontSize: 22,
     lineHeight: 24,
   },
   body: {
