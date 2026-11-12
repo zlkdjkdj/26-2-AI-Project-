@@ -29,7 +29,7 @@ def git(args, env):
 def local_secret_values():
     # Check known local credentials even when their format is not recognized.
     values = set()
-    for directory in (ROOT, ROOT/'backend', ROOT/'frontend'):
+    for directory in (ROOT, ROOT/'mobile'):
         for file in directory.glob('.env*'):
             if file.name.endswith('.example') or not file.is_file():
                 continue
@@ -40,10 +40,6 @@ def local_secret_values():
                 value = match[2].strip().strip('\"\'')
                 if len(value) >= 12 and not value.startswith('#'):
                     values.add(value.encode())
-    code_file=ROOT/'backend/data/demo-access-code.txt'
-    if code_file.is_file():
-        code=code_file.read_bytes().strip()
-        if len(code)>=16:values.add(code)
     return values
 
 
