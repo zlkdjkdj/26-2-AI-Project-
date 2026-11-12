@@ -26,7 +26,7 @@ export default function Modes() {
             "사진 한 장으로 확인하고 싶다면",
             "사진 안전점검",
             "위험 위치 · 참고 점수 · 물건별 권고",
-            "개인 PC 서버와 시연 코드 필요",
+            "Tailscale 연결과 PC 분석 서버 필요",
             "/photo",
           ],
           [

@@ -7,9 +7,11 @@ import java.net.NetworkInterface
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import com.oney.WebRTCModule.PersonVideoDetector
 
 class HomecamBridgeModule : Module() {
   private var server: HomecamServer? = null
+  private var personDetector: PersonVideoDetector? = null
 
   override fun definition() = ModuleDefinition {
     Name("HomecamBridge")
@@ -42,7 +44,15 @@ class HomecamBridgeModule : Module() {
     Function("setStreaming") { enabled: Boolean -> server?.setStreaming(enabled) }
     Function("takeOffer") { server?.takeOffer() }
     Function("setAnswer") { id: String, sdp: String -> server?.setAnswer(id, sdp) }
+    AsyncFunction("startPersonDetection") { streamId: String ->
+      personDetector?.close()
+      val context = appContext.reactContext ?: throw IllegalStateException("화면을 준비하지 못했습니다.")
+      val next = PersonVideoDetector(context)
+      try { next.start(streamId); personDetector = next } catch (error: Exception) { next.close(); throw error }
+    }
+    Function("personDetectionResult") { personDetector?.result() }
+    AsyncFunction("stopPersonDetection") { personDetector?.close(); personDetector = null }
     AsyncFunction("stop") { server?.close(); server = null }
-    OnDestroy { server?.close(); server = null }
+    OnDestroy { personDetector?.close(); personDetector = null; server?.close(); server = null }
   }
 }

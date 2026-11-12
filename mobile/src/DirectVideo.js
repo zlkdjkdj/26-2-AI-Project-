@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   MediaStream,
   RTCView,
@@ -14,17 +14,25 @@ import {
   tailnetSdp,
 } from "./directProtocol";
 import { excludeUnsupportedAv1 } from "./videoCodecs";
+import { mapPersonBox } from "./personBoxGeometry";
+import { advancePersonTrack } from "./personTracking";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let detectionQueue = Promise.resolve();
+const queueDetection = (operation) => {
+  detectionQueue = detectionQueue.catch(() => {}).then(operation);
+  return detectionQueue;
+};
 async function description(peer) {
+  let firstCandidateAt = 0;
   for (let i = 0; i < 100; i++) {
     if (peer.connectionState === "closed")
       throw new Error("영상 연결이 종료되었습니다.");
-    if (
-      peer.iceGatheringState === "complete" &&
-      hasTailnetCandidate(peer.localDescription?.sdp || "")
-    )
-      break;
+    const hasCandidate = hasTailnetCandidate(peer.localDescription?.sdp || "");
+    if (hasCandidate && !firstCandidateAt) firstCandidateAt = Date.now();
+    // Give other Tailnet interfaces a short chance to appear without waiting
+    // for unrelated ICE interfaces to finish gathering.
+    if (hasCandidate && (peer.iceGatheringState === "complete" || Date.now() - firstCandidateAt >= 400)) break;
     await pause(100);
   }
   const network = await Bridge.networkStatus();
@@ -41,6 +49,37 @@ export default function DirectVideo({
   useKeepAwake();
   const [stream, setStream] = useState(null);
   const [message, setMessage] = useState("영상 준비 중…");
+  const [person, setPerson] = useState(null);
+  const [viewport, setViewport] = useState(null);
+  const [detectionMessage, setDetectionMessage] = useState("");
+  const trackRef = useRef(null);
+  const cameraTrack = useRef(null);
+  const switchingCamera = useRef(false);
+  const [frontCamera, setFrontCamera] = useState(false);
+  useEffect(() => {
+    if (camera || !stream) return;
+    let active = true, timer, lastPoll = Date.now();
+    const pollPerson = () => {
+      if (!active) return;
+      try {
+        const result = Bridge.personDetectionResult();
+        const now = Date.now();
+        trackRef.current = advancePersonTrack(trackRef.current, result, now - lastPoll);
+        lastPoll = now;
+        setPerson(trackRef.current);
+        setDetectionMessage(result?.error ? "사람 인식 사용 불가" : "사람 인식 중 · 최대 1명");
+      }
+      catch { trackRef.current = null; setPerson(null); setDetectionMessage("사람 인식 사용 불가"); }
+      timer = setTimeout(pollPerson, 100);
+    };
+    queueDetection(() => Bridge.startPersonDetection(stream.toURL()))
+      .then(() => { if (active) { setDetectionMessage("사람 인식 중 · 최대 1명"); pollPerson(); } })
+      .catch(() => { if (active) setDetectionMessage("사람 인식 사용 불가"); });
+    return () => {
+      active = false; clearTimeout(timer); trackRef.current = null; setPerson(null);
+      queueDetection(() => Bridge.stopPersonDetection()).catch(() => {});
+    };
+  }, [camera, stream]);
   useEffect(() => {
     let active = true,
       media,
@@ -119,7 +158,7 @@ export default function DirectVideo({
       } catch (error) {
         update(error.message);
       }
-      if (active) poll = setTimeout(cameraPoll, 800);
+      if (active) poll = setTimeout(cameraPoll, 250);
     }
     async function cameraStart() {
       try {
@@ -136,6 +175,7 @@ export default function DirectVideo({
           media.getTracks().forEach((t) => t.stop());
           return;
         }
+        cameraTrack.current = media.getVideoTracks()[0] || null;
         setStream(media);
         Bridge.setStreaming(true);
         update("모니터링 기기 연결 대기 중");
@@ -203,7 +243,7 @@ export default function DirectVideo({
             }
             if (++waits > 35 && current.connectionState !== "connected")
               throw new Error("영상 경로를 다시 연결합니다.");
-            poll = setTimeout(heartbeat, answered ? 2500 : 800);
+            poll = setTimeout(heartbeat, answered ? 2500 : 250);
           } catch (error) {
             if (active && attempt === generation) {
               update(error.message);
@@ -223,6 +263,7 @@ export default function DirectVideo({
     else viewerStart();
     return () => {
       active = false;
+      cameraTrack.current = null;
       ++generation;
       controller.abort();
       clearTimeout(poll);
@@ -239,14 +280,32 @@ export default function DirectVideo({
     };
   }, [camera, connection, onStop]);
   return (
-    <View style={styles.video}>
+    <View style={styles.video} onLayout={(event) => setViewport(event.nativeEvent.layout)}>
       {stream && (
         <RTCView
           streamURL={stream.toURL()}
           style={StyleSheet.absoluteFill}
           objectFit={fit}
+          mirror={camera && frontCamera}
         />
       )}
+      {camera && stream && <Pressable accessibilityRole="button" accessibilityLabel="전면 후면 카메라 전환" style={styles.switchCamera} onPress={async () => {
+        if (switchingCamera.current) return;
+        const track = cameraTrack.current;
+        if (!track) return;
+        switchingCamera.current = true;
+        try {
+          const nextFront = !frontCamera;
+          await track.applyConstraints({ facingMode: nextFront ? "user" : "environment", width: 1280, height: 720, frameRate: 20 });
+          if (cameraTrack.current === track) setFrontCamera(nextFront);
+        } catch (error) { if (cameraTrack.current === track) setMessage(error.message || "카메라를 전환하지 못했습니다."); }
+        finally { switchingCamera.current = false; }
+      }}><Text style={styles.switchText}>전면 · 후면 전환</Text></Pressable>}
+      {!camera && stream && person && viewport && (() => {
+        const bounds = mapPersonBox(person, { width: person.frameWidth, height: person.frameHeight }, viewport, fit);
+        return bounds ? <View pointerEvents="none" style={[styles.personBox, bounds]}><Text style={styles.personLabel}>사람</Text></View> : null;
+      })()}
+      {!camera && stream && !!detectionMessage && <Text pointerEvents="none" style={styles.detectionStatus}>{detectionMessage}</Text>}
       <View style={styles.status}>
         <Text style={styles.text}>{message}</Text>
       </View>
@@ -270,4 +329,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  switchCamera: { position: "absolute", top: 16, right: 16, backgroundColor: "#191b20e6", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12 },
+  switchText: { color: "#fff", fontSize: 13, fontFamily: "SUIT-Medium" },
+  personBox: { position: "absolute", borderColor: "#4C95F7", borderWidth: 2 },
+  personLabel: { alignSelf: "flex-start", color: "#fff", backgroundColor: "#1765bd", paddingHorizontal: 6, paddingVertical: 2, fontSize: 12 },
+  detectionStatus: { position: "absolute", top: 12, left: 12, color: "#fff", backgroundColor: "#191b20d9", paddingHorizontal: 8, paddingVertical: 5, fontSize: 12 },
 });

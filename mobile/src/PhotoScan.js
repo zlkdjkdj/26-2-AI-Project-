@@ -16,6 +16,7 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 import { serverAddress } from "./api";
+import { isTailnet } from "./directProtocol";
 import { scoreMessage } from "./scanFeedback";
 import { colors as c, fonts as f } from "./ui";
 import { Enter, PageHeader, Progress, Notice } from "./appUi";
@@ -92,8 +93,9 @@ export default function PhotoScan({ initialServer, onBack }) {
   const reduced = useReducedMotion();
   const [selectedHazard, setSelectedHazard] = useState(0);
   const [server, setServer] = useState(initialServer || "");
-  const [code, setCode] = useState("");
-  const [csrf, setCsrf] = useState(null);
+  const [serverReady, setServerReady] = useState(() => {
+    try { return isTailnet(new URL(serverAddress(initialServer || "")).hostname); } catch { return false; }
+  });
   const [photo, setPhoto] = useState(null);
   const [target, setTarget] = useState("elderly");
   const [room, setRoom] = useState("living_room");
@@ -104,11 +106,10 @@ export default function PhotoScan({ initialServer, onBack }) {
     async (path, options = {}) => {
       const response = await expoFetch(`${serverAddress(server)}${path}`, {
         ...options,
-        credentials: "include",
+        credentials: "omit",
       });
       const data = await response.json();
       if (!response.ok) {
-        if (response.status === 401) setCsrf(null);
         throw new Error(
           typeof data.detail === "string"
             ? data.detail
@@ -119,45 +120,15 @@ export default function PhotoScan({ initialServer, onBack }) {
     },
     [server],
   );
-  useEffect(() => {
-    if (!server) return;
-    let address;
-    try {
-      address = serverAddress(server);
-    } catch {
-      return;
-    }
-    let active = true;
-    expoFetch(`${address}/api/demo/status`, { credentials: "include" })
-      .then((response) => response.json())
-      .then((data) => {
-        if (active && data.unlocked) setCsrf(data.csrf_token);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [server]);
-  async function unlock() {
-    setBusy(true);
+  async function connectServer() {
     setError("");
     try {
-      const data = await jsonRequest("/api/demo/unlock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim() }),
-      });
-      setCsrf(data.csrf_token);
-      setCode("");
-      SecureStore.setItemAsync(
-        PHOTO_SERVER_STORAGE,
-        serverAddress(server),
-      ).catch(() => {});
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
+      const address = serverAddress(server);
+      if (!isTailnet(new URL(address).hostname))
+        throw new Error("코드 없이 이용하려면 PC의 Tailscale 주소를 입력하세요.");
+      await SecureStore.setItemAsync(PHOTO_SERVER_STORAGE, address);
+      setServerReady(true);
+    } catch (e) { setError(e.message); }
   }
   async function selectPhoto(camera) {
     setError("");
@@ -199,11 +170,11 @@ export default function PhotoScan({ initialServer, onBack }) {
       data.append("space_type", room);
       data.append("space_name", "우리집");
       data.append("save_image", "false");
-      data.append("defer_explanation", "true");
+      data.append("defer_explanation", "false");
       setResult(
         await jsonRequest("/api/analyze/image", {
           method: "POST",
-          headers: { "X-CSRF-Token": csrf },
+          headers: { "X-Atchacha-Photo": "1" },
           body: data,
         }),
       );
@@ -245,7 +216,7 @@ export default function PhotoScan({ initialServer, onBack }) {
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
   }, [result?.scan_id]);
-  const showResult = !!csrf && !!result;
+  const showResult = !!result;
   const hazards = result?.hazards || [];
   const selected = hazards[selectedHazard];
   function chooseHazard(index) {
@@ -281,16 +252,15 @@ export default function PhotoScan({ initialServer, onBack }) {
             }
           />
           <Progress
-            labels={["잠금 해제", "사진 점검", "결과 확인"]}
-            current={!csrf ? 0 : showResult ? 2 : 1}
+            labels={["서버 연결", "사진 점검", "결과 확인"]}
+            current={!serverReady ? 0 : showResult ? 2 : 1}
           />
           {!!error && <Notice tone="error">{error}</Notice>}
-          {!csrf ? (
+          {!serverReady ? (
             <View style={s.card}>
-              <Text style={s.heading}>사진점검 잠금 해제</Text>
+              <Text style={s.heading}>사진 분석 서버 연결</Text>
               <Text style={s.note}>
-                개인 PC 서버 주소와 기존 시연 코드를 입력하세요. 홈캠 QR
-                연결과는 별개입니다.
+                PC와 휴대폰에서 Tailscale을 켜고 PC 서버 주소를 입력하세요. 주소는 이 기기에 저장됩니다.
               </Text>
               <Text style={s.label}>PC 서버 주소</Text>
               <TextInput
@@ -304,31 +274,13 @@ export default function PhotoScan({ initialServer, onBack }) {
                 placeholder="http://100.x.x.x:8000"
                 editable={!busy}
               />
-              <Text style={s.label}>시연 코드</Text>
-              <TextInput
-                accessibilityLabel="사진 점검 시연 코드"
-                style={s.input}
-                value={code}
-                onChangeText={setCode}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="기존 시연 코드"
-                editable={!busy}
-              />
-              <Button
-                title={busy ? "연결 확인 중…" : "잠금 해제"}
-                onPress={unlock}
-                disabled={busy || !server.trim() || !code.trim()}
-              />
-              <Text style={s.note}>
-                서버 주소만 이 기기에 기억합니다. 시연 코드와 CSRF 토큰은
-                저장하지 않습니다.
-              </Text>
+              <Button title="서버 주소 저장" onPress={connectServer} disabled={!server.trim()} />
             </View>
           ) : !showResult ? (
             <>
               <View style={s.card}>
+                <Text style={s.note}>PC 분석 서버 · {server}</Text>
+                <Button secondary title="서버 주소 변경" onPress={() => setServerReady(false)} disabled={busy} />
                 <Text style={s.heading}>공간 사진</Text>
                 {photo ? (
                   <PhotoPreview photo={photo} />
