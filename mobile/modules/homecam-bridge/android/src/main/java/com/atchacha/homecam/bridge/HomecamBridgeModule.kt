@@ -44,6 +44,15 @@ class HomecamBridgeModule : Module() {
     Function("setStreaming") { enabled: Boolean -> server?.setStreaming(enabled) }
     Function("takeOffer") { server?.takeOffer() }
     Function("setAnswer") { id: String, sdp: String -> server?.setAnswer(id, sdp) }
+    AsyncFunction("offlineModelReady") { OfflinePhotoDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
+    AsyncFunction("downloadOfflineModel") { OfflinePhotoDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
+    AsyncFunction("removeOfflineModel") { OfflinePhotoDetector.remove(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
+    AsyncFunction("detectOfflinePhoto") { uri: String -> OfflinePhotoDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }
+    AsyncFunction("electricalModelSupported") { OfflineElectricalDetector.supported(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
+    AsyncFunction("electricalModelReady") { OfflineElectricalDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
+    AsyncFunction("downloadElectricalModel") { OfflineElectricalDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
+    AsyncFunction("removeElectricalModel") { OfflineElectricalDetector.remove(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
+    AsyncFunction("detectElectricalPhoto") { uri: String -> OfflineElectricalDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }
     AsyncFunction("startPersonDetection") { streamId: String ->
       personDetector?.close()
       val context = appContext.reactContext ?: throw IllegalStateException("화면을 준비하지 못했습니다.")

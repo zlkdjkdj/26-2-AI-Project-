@@ -40,6 +40,11 @@ export default function HomeCamRoles() {
         앱 홈캠은 PC 없이 연결되며 소리와 영상을 저장하지 않습니다. 자동 낙상
         감지·긴급 출동 기능은 제공하지 않습니다.
       </Text>
+      <Text style={s.section}>추가 기능</Text>
+      <Text style={s.text}>사진을 촬영해 가구 주변을 점검할 수 있어요. 가구 모델은 필요한 경우 별도로 내려받습니다.</Text>
+      <Button secondary icon={ShieldCheck} onPress={() => router.push("/photo")}>
+        사진 안전점검 열기
+      </Button>
       <Text style={s.section}>PC 브라우저에서 보고 싶다면</Text>
       <Text style={s.text}>
         개인 PC 서버에 연결해 기존 웹 홈캠을 사용할 수 있어요.

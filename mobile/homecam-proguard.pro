@@ -4,3 +4,6 @@
 
 # Room instantiates generated database implementations reflectively at startup.
 -keep class * extends androidx.room.RoomDatabase { public <init>(); }
+
+# ONNX Runtime uses JNI names that must survive release shrinking.
+-keep class ai.onnxruntime.** { *; }

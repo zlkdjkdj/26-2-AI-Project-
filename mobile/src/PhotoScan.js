@@ -22,6 +22,8 @@ import { colors as c, fonts as f } from "./ui";
 import { Enter, PageHeader, Progress, Notice } from "./appUi";
 import { PHOTO_SERVER_STORAGE } from "./photoConnection";
 import { useReducedMotion } from "./introMotion";
+import Bridge from "../modules/homecam-bridge";
+import { offlineResult } from "./offlineSafety";
 
 const targets = {
   elderly: "노약자",
@@ -93,6 +95,11 @@ export default function PhotoScan({ initialServer, onBack }) {
   const reduced = useReducedMotion();
   const [selectedHazard, setSelectedHazard] = useState(0);
   const [server, setServer] = useState(initialServer || "");
+  const [mode, setMode] = useState("offline");
+  const [modelReady, setModelReady] = useState(null);
+  const [electricalReady, setElectricalReady] = useState(null);
+  const [includeElectrical, setIncludeElectrical] = useState(false);
+  const [electricalSupported, setElectricalSupported] = useState(null);
   const [serverReady, setServerReady] = useState(() => {
     try { return isTailnet(new URL(serverAddress(initialServer || "")).hostname); } catch { return false; }
   });
@@ -120,6 +127,37 @@ export default function PhotoScan({ initialServer, onBack }) {
     },
     [server],
   );
+  useEffect(() => {
+    let active = true;
+    Bridge.offlineModelReady().then((ready) => { if (active) setModelReady(ready); }).catch(() => { if (active) setModelReady(false); });
+    Bridge.electricalModelSupported().then((ready) => { if (active) setElectricalSupported(ready); }).catch(() => { if (active) setElectricalSupported(false); });
+    Bridge.electricalModelReady().then((ready) => { if (active) setElectricalReady(ready); }).catch(() => { if (active) setElectricalReady(false); });
+    return () => { active = false; };
+  }, []);
+  async function downloadModel() {
+    setBusy(true); setError("");
+    try { await Bridge.downloadOfflineModel(); setModelReady(true); }
+    catch (e) { setError(e.message || "모델 다운로드에 실패했습니다."); }
+    finally { setBusy(false); }
+  }
+  async function removeModel() {
+    setBusy(true); setError("");
+    try { await Bridge.removeOfflineModel(); setModelReady(false); setPhoto(null); setResult(null); }
+    catch (e) { setError(e.message || "모델을 삭제하지 못했습니다."); }
+    finally { setBusy(false); }
+  }
+  async function downloadElectrical() {
+    setBusy(true); setError("");
+    try { await Bridge.downloadElectricalModel(); setElectricalReady(true); setIncludeElectrical(false); }
+    catch (e) { setError(e.message || "전기 탐지 모델 다운로드에 실패했습니다."); }
+    finally { setBusy(false); }
+  }
+  async function removeElectrical() {
+    setBusy(true); setError("");
+    try { await Bridge.removeElectricalModel(); setElectricalReady(false); }
+    catch (e) { setError(e.message || "전기 탐지 모델을 삭제하지 못했습니다."); }
+    finally { setBusy(false); }
+  }
   async function connectServer() {
     setError("");
     try {
@@ -164,6 +202,13 @@ export default function PhotoScan({ initialServer, onBack }) {
     setBusy(true);
     setError("");
     try {
+      if (mode === "offline") {
+        const detections = await Bridge.detectOfflinePhoto(photo.uri);
+        const useElectrical = electricalReady && includeElectrical;
+        if (useElectrical) detections.push(...await Bridge.detectElectricalPhoto(photo.uri));
+        setResult(offlineResult(detections, target, room, useElectrical));
+        return;
+      }
       const data = new FormData();
       data.append("file", new File(photo.uri), "mobile-room.jpg");
       data.append("target_type", target);
@@ -252,11 +297,22 @@ export default function PhotoScan({ initialServer, onBack }) {
             }
           />
           <Progress
-            labels={["서버 연결", "사진 점검", "결과 확인"]}
-            current={!serverReady ? 0 : showResult ? 2 : 1}
+            labels={["분석 준비", "사진 점검", "결과 확인"]}
+            current={(mode === "offline" ? !modelReady : !serverReady) ? 0 : showResult ? 2 : 1}
           />
           {!!error && <Notice tone="error">{error}</Notice>}
-          {!serverReady ? (
+          {!showResult && <View style={s.row}>
+            <Button secondary={mode !== "offline"} title="휴대폰에서 분석" disabled={busy} onPress={() => { setMode("offline"); setError(""); }} />
+            <Button secondary={mode !== "server"} title="PC 서버로 분석" disabled={busy} onPress={() => { setMode("server"); setError(""); }} />
+          </View>}
+          {mode === "offline" && !modelReady ? (
+            <View style={s.card}>
+              <Text style={s.heading}>가구 점검 모델 추가</Text>
+              <Text style={s.note}>약 13MB를 한 번 다운로드하면 이후 PC와 인터넷 없이 휴대폰에서 가구와 일반 물건을 분석합니다. 전기 위험 점검은 아래에서 별도로 다운로드할 수 있습니다.</Text>
+              <Button title={modelReady === null ? "모델 확인 중…" : busy ? "모델 다운로드 중…" : "가구 점검 모델 다운로드"} onPress={downloadModel} disabled={busy || modelReady === null} />
+              <Text style={s.note}>다운로드 시 데이터가 사용됩니다. 사진은 기기 밖으로 전송하지 않습니다.</Text>
+            </View>
+          ) : mode === "server" && !serverReady ? (
             <View style={s.card}>
               <Text style={s.heading}>사진 분석 서버 연결</Text>
               <Text style={s.note}>
@@ -279,8 +335,19 @@ export default function PhotoScan({ initialServer, onBack }) {
           ) : !showResult ? (
             <>
               <View style={s.card}>
-                <Text style={s.note}>PC 분석 서버 · {server}</Text>
-                <Button secondary title="서버 주소 변경" onPress={() => setServerReady(false)} disabled={busy} />
+                {mode === "server" ? <><Text style={s.note}>PC 분석 서버 · {server}</Text><Button secondary title="서버 주소 변경" onPress={() => setServerReady(false)} disabled={busy} /></> : <>
+                  <Text style={s.note}>휴대폰 분석 · 모델을 받은 뒤 인터넷 없이 사진을 분석합니다.</Text>
+                  <Button secondary title="가구 모델 삭제" onPress={removeModel} disabled={busy} />
+                  <Text style={s.heading}>전선·멀티탭·플러그 점검</Text>
+                  {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 현재 전기 시험 모델의 메모리가 부족합니다. 전기 점검은 PC 서버로 분석해 주세요. 기기용 경량 모델은 개발 중입니다.</Text> : electricalReady ? <>
+                    <Text style={s.note}>{includeElectrical ? "전기 위험 후보를 함께 찾습니다. 오래 걸릴 수 있습니다." : "현재 가구만 점검합니다. 전기설비는 확인되지 않습니다."}</Text>
+                    <Button secondary title={includeElectrical ? "전기 점검 끄기" : "전기 점검 켜기"} onPress={() => setIncludeElectrical(!includeElectrical)} disabled={busy} />
+                    <Button secondary title="전기 모델 삭제" onPress={removeElectrical} disabled={busy} />
+                  </> : <>
+                    <Text style={s.note}>실험용 전기 모델을 약 204MB 추가로 받습니다. 높은 메모리를 사용하며 분석에 오래 걸릴 수 있습니다.</Text>
+                    <Button secondary title={busy ? "전기 모델 다운로드 중…" : "전기 위험 모델 다운로드"} onPress={downloadElectrical} disabled={busy || electricalReady === null || electricalSupported === null} />
+                  </>}
+                </>}
                 <Text style={s.heading}>공간 사진</Text>
                 {photo ? (
                   <PhotoPreview photo={photo} />
@@ -330,13 +397,11 @@ export default function PhotoScan({ initialServer, onBack }) {
                 />
                 {busy && (
                   <Notice loading>
-                    탐지 결과를 준비하고 있어요. 완료되면 결과 화면으로
-                    이동합니다.
+                    탐지 결과를 준비하고 있어요. 전기 모델을 함께 사용하면 구형 기기에서 오래 걸릴 수 있습니다.
                   </Notice>
                 )}
                 <Text style={s.note}>
-                  점검 사진은 서버에 보관하지 않습니다. 분석 결과는 기존 보관
-                  설정을 따릅니다.
+                  {mode === "offline" ? "사진과 결과는 분석을 위해 외부로 전송하지 않습니다." : "점검 사진은 서버에 보관하지 않습니다. 분석 결과는 기존 보관 설정을 따릅니다."}
                 </Text>
               </View>
             </>
@@ -490,11 +555,12 @@ function PhotoPreview({ photo, hazards = [], selected = -1, onSelect }) {
                 width: `${h.bbox[2] * 100}%`,
                 height: `${h.bbox[3] * 100}%`,
                 borderWidth: i === selected ? 3 : 2,
-                borderColor: h.risk_level === "HIGH" ? "#a23d30" : "#8a5b16",
-                backgroundColor: i === selected ? "#ffffff16" : "transparent",
+                borderRadius: 4,
+                borderColor: h.risk_level === "HIGH" ? "#ff5252" : h.risk_level === "MEDIUM" ? "#ffb020" : "#1685ff",
+                backgroundColor: i === selected ? "#ffffff20" : "transparent",
               }}
             >
-              <Text style={s.marker}>{i + 1}</Text>
+              <Text numberOfLines={1} style={[s.marker, { backgroundColor: h.risk_level === "HIGH" ? "#c92b38" : h.risk_level === "MEDIUM" ? "#a75a00" : "#075ac1" }]}>{i + 1} · {h.instance_label || h.object_label}</Text>
             </Pressable>
           ),
       )}
@@ -589,12 +655,20 @@ const s = StyleSheet.create({
   selectedText: { color: "white" },
   score: { fontSize: 36, color: c.accent, fontFamily: f.medium },
   marker: {
+    position: "absolute",
+    top: -20,
+    left: -2,
+    minWidth: 52,
+    maxWidth: 180,
     color: "white",
     backgroundColor: "#a23d30",
     fontSize: 11,
     fontFamily: f.medium,
     alignSelf: "flex-start",
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: "hidden",
   },
   hazard: { borderTopWidth: 1, borderColor: c.line, paddingTop: 20, gap: 12 },
   hazardTitle: {

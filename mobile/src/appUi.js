@@ -77,7 +77,7 @@ export function Page({ children }) {
 export function PageHeader({ title, eyebrow, description, onBack }) {
   return (
     <>
-      <BackLink onPress={onBack} />
+      {onBack && <BackLink onPress={onBack} />}
       <View style={a.heading}>
         <Text style={s.eyebrow}>{eyebrow}</Text>
         <Text style={s.title} accessibilityRole="header">
