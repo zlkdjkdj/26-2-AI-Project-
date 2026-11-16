@@ -17,9 +17,11 @@ import { Enter, PageHeader, Progress, Notice } from "./appUi";
 import { useReducedMotion } from "./introMotion";
 import Bridge from "../modules/homecam-bridge";
 import { generalOfflineResult } from "./offlineSafety";
+import { reconcileFurniture } from "./furnitureReconciliation";
+import { runPhotoAnalysis } from "./photoAnalysis";
 import ZoomPhoto from "./ZoomPhoto";
 
-const levels = { HIGH: "고위험", MEDIUM: "중위험", LOW: "저위험" };
+const levels = { HIGH: "고위험", MEDIUM: "중위험", LOW: "저위험", CHECK: "종류 확인" };
 
 function Button({ title, onPress, disabled, secondary }) {
   return (
@@ -45,6 +47,7 @@ function Button({ title, onPress, disabled, secondary }) {
 export default function PhotoScan({ onBack }) {
   const scroll = useRef(null);
   const recommendationY = useRef(0);
+  const alive = useRef(true);
   const reduced = useReducedMotion();
   const [selectedHazard, setSelectedHazard] = useState(0);
   const [showAllBoxes, setShowAllBoxes] = useState(true);
@@ -59,10 +62,11 @@ export default function PhotoScan({ onBack }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
+    alive.current = true;
     Bridge.offlineModelReady().then((ready) => { if (active) setModelReady(ready); }).catch(() => { if (active) setModelReady(false); });
     Bridge.electricalModelSupported().then((ready) => { if (active) setElectricalSupported(ready); }).catch(() => { if (active) setElectricalSupported(false); });
     Bridge.electricalModelReady().then((ready) => { if (active) setElectricalReady(ready); }).catch(() => { if (active) setElectricalReady(false); });
-    return () => { active = false; };
+    return () => { active = false; alive.current = false; };
   }, []);
   async function downloadModel() {
     setBusy(true); setError("");
@@ -122,15 +126,23 @@ export default function PhotoScan({ onBack }) {
     setShowAllBoxes(true);
     setBusy(true);
     setError("");
+    const started = Date.now();
     try {
-      const detections = await Bridge.detectOfflinePhoto(photo.uri);
       const useElectrical = electricalReady && includeElectrical;
-      if (useElectrical) detections.push(...await Bridge.detectElectricalPhoto(photo.uri));
-      setResult(generalOfflineResult(detections, useElectrical));
+      const parallel = useElectrical && await Bridge.photoParallelSupported().catch(() => false);
+      const outcome = await runPhotoAnalysis({ bridge: Bridge, uri: photo.uri, useExtra: useElectrical, parallel,
+        onPartial: local => {
+          if (alive.current) setResult({ ...generalOfflineResult(local, false), preliminary: true, explanation_pending: true, elapsed_ms: Date.now() - started });
+        },
+      });
+      if (alive.current) {
+        setSelectedHazard(0); setShowAllBoxes(true);
+        setResult({ ...generalOfflineResult(reconcileFurniture(outcome.detections), outcome.extraUsed), extraError: outcome.extraError, elapsed_ms: Date.now() - started });
+      }
     } catch (e) {
-      setError(e.message);
+      if (alive.current) setError(e.message);
     } finally {
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
   useEffect(() => {
@@ -190,13 +202,13 @@ export default function PhotoScan({ onBack }) {
               <View style={s.card}>
                   <Text style={s.note}>휴대폰 분석 · 모델을 받은 뒤 인터넷 없이 사진을 분석합니다.</Text>
                   <Button secondary title="가구 모델 삭제" onPress={removeModel} disabled={busy} />
-                  <Text style={s.heading}>전기설비·바닥 위험 후보 점검</Text>
-                  {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 전기 점검 모델을 실행하기에 메모리가 부족합니다. 전선과 멀티탭은 직접 확인해 주세요.</Text> : electricalReady ? <>
-                    <Text style={s.note}>{includeElectrical ? "전기설비와 물기·매트 후보를 함께 찾습니다. 오래 걸릴 수 있습니다." : "현재 가구만 점검합니다. 전기설비는 확인되지 않습니다."}</Text>
+                  <Text style={s.heading}>전기·바닥 위험과 물건 종류 추가 확인</Text>
+                  {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 추가 점검 모델을 실행하기에 메모리가 부족합니다. 물건 종류와 전기설비는 직접 확인해 주세요.</Text> : electricalReady ? <>
+                    <Text style={s.note}>{includeElectrical ? "전기설비·물기·매트와 선풍기·의자·책상·테이블 후보를 추가 모델로 확인합니다. 분석에 더 오래 걸릴 수 있습니다." : "현재 기본 가구 모델만 사용합니다. 추가 물건 분류와 전기설비는 확인되지 않습니다."}</Text>
                     <Button secondary title={includeElectrical ? "추가 점검 끄기" : "추가 점검 켜기"} onPress={() => setIncludeElectrical(!includeElectrical)} disabled={busy} />
                     <Button secondary title="전기 모델 삭제" onPress={removeElectrical} disabled={busy} />
                   </> : <>
-                    <Text style={s.note}>실험용 전기 모델을 약 204MB 추가로 받습니다. 높은 메모리를 사용하며 분석에 오래 걸릴 수 있습니다.</Text>
+                    <Text style={s.note}>전기설비와 물건 종류를 더 확인하려면 실험용 추가 모델 약 204MB를 받습니다. 메모리를 많이 사용하며 분석에 오래 걸릴 수 있습니다.</Text>
                     <Button secondary title={busy ? "전기 모델 다운로드 중…" : "추가 위험 모델 다운로드"} onPress={downloadElectrical} disabled={busy || electricalReady === null || electricalSupported === null} />
                   </>}
                 <Text style={s.heading}>공간 사진</Text>
@@ -244,7 +256,7 @@ export default function PhotoScan({ onBack }) {
           ) : (
             <>
               <View style={s.scoreCard}>
-                <Text style={s.label}>참고 안전점수</Text>
+                <Text style={s.label}>{result.preliminary ? "1차 참고 안전점수 · 추가 분석 중" : "참고 안전점수"}</Text>
                 <Text style={s.score}>
                   {result.score_computable === false
                     ? "점수 산정 보류"
@@ -255,7 +267,10 @@ export default function PhotoScan({ onBack }) {
                   탐지된 물건 {result.detected_objects?.length || 0}개 · 위험
                   확인 항목 {hazards.length}개
                 </Text>
+                {!!result.elapsed_ms && <Text style={s.note}>{result.preliminary ? "1차 결과" : "분석 완료"} · {(result.elapsed_ms / 1000).toFixed(1)}초</Text>}
               </View>
+              {result.preliminary && <Notice loading>기본 모델의 임시 결과입니다. 전선·바닥과 물건 종류를 추가 확인 중이며 최종 결과와 점수는 바뀔 수 있습니다.</Notice>}
+              {!!result.extraError && <Notice tone="error">추가 모델 분석에 실패해 기본 모델 결과만 표시합니다. 전기설비와 물건 종류를 직접 확인하세요. {result.extraError}</Notice>}
               <View style={s.card}>
                 <Text style={s.heading}>종합 안전 피드백</Text>
                 <Text style={s.body}>{overall.summary}</Text>
@@ -349,13 +364,13 @@ export default function PhotoScan({ onBack }) {
               )}
               {result.explanation_pending && (
                 <Notice loading>
-                  추가 설명을 준비하고 있어요. 사진 피드백은 먼저 확인할 수
-                  있습니다.
+                  추가 모델 분석을 진행하고 있어요. 전선과 물건 종류는 최종 결과를 확인하세요.
                 </Notice>
               )}
               <Button
                 title="사진 선택으로 돌아가기"
                 secondary
+                disabled={busy}
                 onPress={() => {
                   setResult(null);
                   setError("");
@@ -364,6 +379,7 @@ export default function PhotoScan({ onBack }) {
               />
               <Button
                 title="다른 사진으로 점검하기"
+                disabled={busy}
                 onPress={() => {
                   setResult(null);
                   setPhoto(null);

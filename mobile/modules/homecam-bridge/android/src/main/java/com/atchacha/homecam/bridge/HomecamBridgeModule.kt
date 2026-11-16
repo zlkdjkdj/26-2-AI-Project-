@@ -18,6 +18,10 @@ import android.util.Rational
 import expo.modules.kotlin.functions.Queues
 import android.app.Activity
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 class HomecamBridgeModule : Module() {
   private var server: HomecamServer? = null
@@ -25,6 +29,7 @@ class HomecamBridgeModule : Module() {
   private var fallRecorder: FallEventRecorder? = null
   private var manualRecorder: FallEventRecorder? = null
   private var pipActivity: WeakReference<Activity>? = null
+  private val photoScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   override fun definition() = ModuleDefinition {
     Name("HomecamBridge")
@@ -60,12 +65,13 @@ class HomecamBridgeModule : Module() {
     AsyncFunction("offlineModelReady") { OfflinePhotoDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("downloadOfflineModel") { OfflinePhotoDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
     AsyncFunction("removeOfflineModel") { OfflinePhotoDetector.remove(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
-    AsyncFunction("detectOfflinePhoto") { uri: String -> OfflinePhotoDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }
+    AsyncFunction("detectOfflinePhoto") { uri: String -> OfflinePhotoDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }.runOnQueue(photoScope)
     AsyncFunction("electricalModelSupported") { OfflineElectricalDetector.supported(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("electricalModelReady") { OfflineElectricalDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("downloadElectricalModel") { OfflineElectricalDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
     AsyncFunction("removeElectricalModel") { OfflineElectricalDetector.remove(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
-    AsyncFunction("detectElectricalPhoto") { uri: String -> OfflineElectricalDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }
+    AsyncFunction("photoParallelSupported") { OfflineElectricalDetector.parallelSupported(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
+    AsyncFunction("detectElectricalPhoto") { uri: String, parallel: Boolean -> OfflineElectricalDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri, parallel) }.runOnQueue(photoScope)
     AsyncFunction("startPersonDetection") { streamId: String ->
       personDetector?.close()
       val context = appContext.reactContext ?: throw IllegalStateException("화면을 준비하지 못했습니다.")
@@ -132,6 +138,6 @@ class HomecamBridgeModule : Module() {
       if (file.exists() && !file.delete()) throw IllegalStateException("영상을 삭제하지 못했습니다.")
     }
     AsyncFunction("stop") { server?.close(); server = null }
-    OnDestroy { manualRecorder?.close(); manualRecorder = null; fallRecorder?.close(); fallRecorder = null; personDetector?.close(); personDetector = null; server?.close(); server = null }
+    OnDestroy { photoScope.cancel(); manualRecorder?.close(); manualRecorder = null; fallRecorder?.close(); fallRecorder = null; personDetector?.close(); personDetector = null; server?.close(); server = null }
   }
 }

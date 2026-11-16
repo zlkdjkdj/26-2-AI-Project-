@@ -7,6 +7,7 @@ import ai.onnxruntime.*;
 import java.io.*;
 import java.nio.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 /** Optional existing Grounding DINO model; fixed tokenized prompts, no network during inference. */
 public final class OfflineElectricalDetector {
@@ -15,11 +16,20 @@ public final class OfflineElectricalDetector {
   private static final long SIZE=203824675L, MAX=220000000L;
   private static final String[] KINDS={"electric_wire","socket","power_strip","electric_plug","wet_floor","rug"};
   private static final long[][] TOKENS={{101,5992,5830,1012,5992,13307,1012,2373,6167,1012,102},{101,5992,13307,1012,5992,5830,1012,2373,6167,1012,102},{101,2373,6167,1012,5992,13307,1012,5992,5830,1012,102},{101,5992,13354,1012,5992,13307,1012,2373,6167,1012,102},{101,4954,2723,1012,2300,1012,102},{101,20452,10135,1012,102}};
+  // Individual prompts avoid the lower class confidence observed with a combined prompt.
+  private static final String[] FURNITURE_KINDS={"electric_fan","chair","desk","dining_table"};
+  private static final long[][] FURNITURE_TOKENS={{101,5470,1012,102},{101,3242,1012,102},{101,4624,1012,102},{101,2795,1012,102}};
+  private static final float[] FURNITURE_THRESHOLDS={.50f,.38f,.50f,.50f};
   private static File model(Context c) { return new File(c.getFilesDir(),"photo-electrical-v1.onnx"); }
   public static boolean supported(Context c) {
     ActivityManager.MemoryInfo info=new ActivityManager.MemoryInfo();
     ((ActivityManager)c.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryInfo(info);
     return info.totalMem >= 5L * 1024 * 1024 * 1024;
+  }
+  public static boolean parallelSupported(Context c) {
+    ActivityManager.MemoryInfo info=new ActivityManager.MemoryInfo();
+    ((ActivityManager)c.getSystemService(Context.ACTIVITY_SERVICE)).getMemoryInfo(info);
+    return info.totalMem>=10L*1024*1024*1024 && info.availMem>=3L*1024*1024*1024 && !info.lowMemory && Runtime.getRuntime().availableProcessors()>=6;
   }
   public static boolean ready(Context c) {try {File f=model(c);return f.isFile()&&f.length()==SIZE&&HASH.equals(OfflinePhotoDetector.digest(f));}catch(Exception e){return false;}}
   public static void download(Context c) throws Exception {OfflinePhotoDetector.downloadFile(URL,model(c),HASH,MAX);}
@@ -31,7 +41,7 @@ public final class OfflineElectricalDetector {
     float[] means={.485f,.456f,.406f},std={.229f,.224f,.225f};
     for(int channel=0;channel<3;channel++)for(int color:colors)pixels.put(((((color>>(16-channel*8))&255)/255f)-means[channel])/std[channel]);pixels.rewind();return pixels;
   }
-  public static List<Map<String,Object>> detect(Context c,String uri) throws Exception {
+  public static List<Map<String,Object>> detect(Context c,String uri,boolean parallel) throws Exception {
     if(!supported(c))throw new IOException("이 기기는 추가 위험 탐지 모델의 메모리가 부족합니다. 전기설비와 바닥 상태를 직접 확인해 주세요.");
     if(!ready(c))throw new IOException("전기 위험 탐지 모델을 먼저 다운로드해 주세요.");
     Uri u=Uri.parse(uri);if(!"file".equals(u.getScheme()))throw new IOException("사진 파일을 읽을 수 없습니다.");
@@ -52,34 +62,70 @@ public final class OfflineElectricalDetector {
     }
     original.recycle();
     LongBuffer mask=ByteBuffer.allocateDirect(n*8).order(ByteOrder.nativeOrder()).asLongBuffer();for(int i=0;i<n;i++)mask.put(1);mask.rewind();
-    OrtEnvironment env=OrtEnvironment.getEnvironment();List<Box> candidates=new ArrayList<>();
+    OrtEnvironment env=OrtEnvironment.getEnvironment();List<Box> candidates=new ArrayList<>(), furnitureCandidates=new ArrayList<>();
     try(OrtSession.SessionOptions opts=new OrtSession.SessionOptions()){
       opts.setIntraOpNumThreads(2);
-      try(OrtSession session=env.createSession(model(c).getAbsolutePath(),opts);OnnxTensor maskTensor=OnnxTensor.createTensor(env,mask,new long[]{1,800,800})){
-        for(int pass=0;pass<KINDS.length+2;pass++){
-          int k=pass<KINDS.length?pass:0; int variant=pass<KINDS.length?0:pass-KINDS.length+1;
-          float[] region=variant==0?new float[]{0,0,1,1}:regions[variant-1];
-          long[] ones=new long[TOKENS[k].length];Arrays.fill(ones,1);long[] zeros=new long[TOKENS[k].length];
-          try(OnnxTensor pixelTensor=OnnxTensor.createTensor(env,images[variant],new long[]{1,3,800,800});OnnxTensor ids=OnnxTensor.createTensor(env,new long[][]{TOKENS[k]});OnnxTensor types=OnnxTensor.createTensor(env,new long[][]{zeros});OnnxTensor attention=OnnxTensor.createTensor(env,new long[][]{ones})){
-            Map<String,OnnxTensor> inputs=new HashMap<>();inputs.put("pixel_values",pixelTensor);inputs.put("pixel_mask",maskTensor);inputs.put("input_ids",ids);inputs.put("token_type_ids",types);inputs.put("attention_mask",attention);
-            try(OrtSession.Result out=session.run(inputs)){
-              FloatBuffer logits=((OnnxTensor)out.get("logits").get()).getFloatBuffer();FloatBuffer boxes=((OnnxTensor)out.get("pred_boxes").get()).getFloatBuffer();
-              for(int i=0;i<900;i++){
-                float raw=Math.max(logits.get(i*256+1),logits.get(i*256+2));float score=(float)(1.0/(1.0+Math.exp(-Math.max(-40,Math.min(40,raw)))));if(score<(k>=4 ? .48f : .35f))continue;
-                float cx=boxes.get(i*4),cy=boxes.get(i*4+1),w=boxes.get(i*4+2),h=boxes.get(i*4+3);
-                float x1=Math.max(0,cx-w/2),y1=Math.max(0,cy-h/2),x2=Math.min(1,cx+w/2),y2=Math.min(1,cy+h/2);
-                if((x2-x1)*width<3||(y2-y1)*height<3)continue;
-                Box b=new Box();b.type=KINDS[k];b.score=score;b.x=region[0]+x1*(region[2]-region[0]);b.y=region[1]+y1*(region[3]-region[1]);b.w=(x2-x1)*(region[2]-region[0]);b.h=(y2-y1)*(region[3]-region[1]);
-                if(variant>0 && (b.w*b.h>.25f || Math.min(b.w,b.h)<.003f))continue;
-                candidates.add(b);
-              }
+      try(OrtSession session=env.createSession(model(c).getAbsolutePath(),opts);
+          OnnxTensor maskTensor=OnnxTensor.createTensor(env,mask,new long[]{1,800,800});
+          OnnxTensor fullImage=OnnxTensor.createTensor(env,images[0],new long[]{1,3,800,800});
+          OnnxTensor leftImage=OnnxTensor.createTensor(env,images[1],new long[]{1,3,800,800});
+          OnnxTensor rightImage=OnnxTensor.createTensor(env,images[2],new long[]{1,3,800,800})){
+        OnnxTensor[] pixelTensors={fullImage,leftImage,rightImage};
+        if(parallel && parallelSupported(c)) {
+          ExecutorService workers=Executors.newFixedThreadPool(2);
+          List<Future<List<Box>>> futures=new ArrayList<>();
+          try {
+            for(int i=0;i<KINDS.length+2+FURNITURE_KINDS.length;i++) { final int pass=i; futures.add(workers.submit(()->inferPass(env,session,pixelTensors,maskTensor,regions,width,height,pass))); }
+            Exception failure=null; boolean interrupted=false;
+            for(int i=0;i<futures.size();i++) {
+              Future<List<Box>> future=futures.get(i);
+              while(true) try { if(i<KINDS.length+2) candidates.addAll(future.get()); else furnitureCandidates.addAll(future.get()); break; }
+              catch(InterruptedException e) { interrupted=true; }
+              catch(ExecutionException e) { if(failure==null) failure=new IOException("물건 종류 추가 확인을 완료하지 못했습니다.",e.getCause()); break; }
             }
+            if(interrupted) Thread.currentThread().interrupt();
+            if(failure!=null) throw failure;
+          } finally {
+            workers.shutdown(); boolean interrupted=Thread.interrupted();
+            while(!workers.isTerminated()) try { workers.awaitTermination(1,TimeUnit.SECONDS); } catch(InterruptedException e) { interrupted=true; }
+            if(interrupted) Thread.currentThread().interrupt();
           }
+        } else {
+          for(int pass=0;pass<KINDS.length+2;pass++) candidates.addAll(inferPass(env,session,pixelTensors,maskTensor,regions,width,height,pass));
+          for(int i=0;i<FURNITURE_KINDS.length;i++) furnitureCandidates.addAll(inferPass(env,session,pixelTensors,maskTensor,regions,width,height,KINDS.length+2+i));
         }
       }
     }
     candidates.sort((a,b)->Float.compare(b.score,a.score));List<Box> kept=new ArrayList<>();
     for(Box b:candidates){boolean overlap=false;for(Box existing:kept){float ratio=iou(existing,b);if(existing.type.equals(b.type)&&ratio>.45f){overlap=true;break;}if(!existing.type.equals(b.type)&&ratio>.75f){if(!existing.alternatives.contains(b.type))existing.alternatives.add(b.type);overlap=true;break;}}if(!overlap&&kept.size()<15)kept.add(b);}
-    List<Map<String,Object>> result=new ArrayList<>();for(Box b:kept){Map<String,Object> item=new HashMap<>();item.put("object_type",b.type);item.put("confidence",(double)b.score);item.put("bbox",Arrays.asList((double)b.x,(double)b.y,(double)b.w,(double)b.h));item.put("alternative_types",b.alternatives);result.add(item);}return result;
+    List<Map<String,Object>> result=new ArrayList<>();for(Box b:kept){Map<String,Object> item=new HashMap<>();item.put("object_type",b.type);item.put("confidence",(double)b.score);item.put("bbox",Arrays.asList((double)b.x,(double)b.y,(double)b.w,(double)b.h));item.put("alternative_types",b.alternatives);result.add(item);}
+    furnitureCandidates.sort((a,b)->Float.compare(b.score,a.score));List<Box> furnitureKept=new ArrayList<>();
+    for(Box b:furnitureCandidates){boolean overlap=false;for(Box existing:furnitureKept){float ratio=iou(existing,b);if(existing.type.equals(b.type)&&ratio>.45f){overlap=true;break;}if(!existing.type.equals(b.type)&&ratio>.65f){if(existing.score-b.score<.10f&&!existing.alternatives.contains(b.type))existing.alternatives.add(b.type);overlap=true;break;}}if(!overlap&&furnitureKept.size()<20)furnitureKept.add(b);}
+    for(Box b:furnitureKept){Map<String,Object> item=new HashMap<>();item.put("object_type",b.type);item.put("confidence",(double)b.score);item.put("bbox",Arrays.asList((double)b.x,(double)b.y,(double)b.w,(double)b.h));item.put("alternative_types",b.alternatives);item.put("source","grounding_furniture");result.add(item);}return result;
+  }
+  private static List<Box> inferPass(OrtEnvironment env,OrtSession session,OnnxTensor[] pixelTensors,OnnxTensor maskTensor,float[][] regions,int width,int height,int pass) throws Exception {
+    boolean furniture=pass>=KINDS.length+2;
+    int furnitureIndex=pass-KINDS.length-2;
+    int k=pass<KINDS.length?pass:0, variant=pass<KINDS.length||furniture?0:pass-KINDS.length+1;
+    float[] region=variant==0?new float[]{0,0,1,1}:regions[variant-1];
+    long[] tokens=furniture?FURNITURE_TOKENS[furnitureIndex]:TOKENS[k];
+    long[] ones=new long[tokens.length];Arrays.fill(ones,1);long[] zeros=new long[tokens.length];
+    List<Box> boxesFound=new ArrayList<>();
+    try(OnnxTensor ids=OnnxTensor.createTensor(env,new long[][]{tokens});OnnxTensor types=OnnxTensor.createTensor(env,new long[][]{zeros});OnnxTensor attention=OnnxTensor.createTensor(env,new long[][]{ones})){
+      Map<String,OnnxTensor> inputs=new HashMap<>();inputs.put("pixel_values",pixelTensors[variant]);inputs.put("pixel_mask",maskTensor);inputs.put("input_ids",ids);inputs.put("token_type_ids",types);inputs.put("attention_mask",attention);
+      try(OrtSession.Result out=session.run(inputs)){
+        FloatBuffer logits=((OnnxTensor)out.get("logits").get()).getFloatBuffer();FloatBuffer boxes=((OnnxTensor)out.get("pred_boxes").get()).getFloatBuffer();
+        for(int i=0;i<900;i++){
+          float raw=furniture?logits.get(i*256+1):Math.max(logits.get(i*256+1),logits.get(i*256+2));float score=(float)(1.0/(1.0+Math.exp(-Math.max(-40,Math.min(40,raw)))));if(score<(furniture?FURNITURE_THRESHOLDS[furnitureIndex]:(k>=4 ? .48f : .35f)))continue;
+          float cx=boxes.get(i*4),cy=boxes.get(i*4+1),w=boxes.get(i*4+2),h=boxes.get(i*4+3);
+          float x1=Math.max(0,cx-w/2),y1=Math.max(0,cy-h/2),x2=Math.min(1,cx+w/2),y2=Math.min(1,cy+h/2);
+          if((x2-x1)*width<3||(y2-y1)*height<3)continue;
+          Box b=new Box();b.type=furniture?FURNITURE_KINDS[furnitureIndex]:KINDS[k];b.score=score;b.x=region[0]+x1*(region[2]-region[0]);b.y=region[1]+y1*(region[3]-region[1]);b.w=(x2-x1)*(region[2]-region[0]);b.h=(y2-y1)*(region[3]-region[1]);
+          if(variant>0 && (b.w*b.h>.25f || Math.min(b.w,b.h)<.003f))continue;
+          boxesFound.add(b);
+        }
+      }
+    }
+    return boxesFound;
   }
 }

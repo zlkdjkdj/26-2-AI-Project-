@@ -1,10 +1,11 @@
 import data from './offlineRules.js';
-const furniture = new Set(['chair','couch','bed','dining_table']);
+import { furnitureAlternatives } from './furnitureReconciliation.js';
+const furniture = new Set(['chair','couch','bed','dining_table','desk']);
 const bags = new Set(['backpack','handbag','suitcase']);
 const appliance = new Set(['oven','microwave','toaster']);
 const heavy = new Set(['tv','potted_plant','vase']);
 const household = new Set(['wine_glass','skateboard','sports_ball','umbrella']);
-const levels = {HIGH:25,MEDIUM:12,LOW:5};
+const levels = {HIGH:25,MEDIUM:12,LOW:5,CHECK:0};
 function evidence(kind,[x,y,w,h]) {
  if(kind==='electric_wire') return y+h>=.85?'image_low_cable':'visible_cable';
  if(kind==='socket') return 'visible_socket';
@@ -30,6 +31,15 @@ export function offlineResult(detections,target,room,electrical=false,general=fa
  const actualRoom=room==='auto'?automaticRoom(detections):room;
  const hazards=[];
  for(const item of detections) {
+  if (item.object_type === 'uncertain_furniture') {
+   const alternatives=furnitureAlternatives(item);
+   hazards.push({object:item.object_type,object_label:'물건 종류 확인 필요',instance_label:alternatives.length?`${alternatives.join('·')} 구분 확인`:'물건 종류 확인',risk_level:'CHECK',bbox:item.bbox,description:'두 탐지 모델이 이 위치의 물건을 다르게 분류했습니다. 사진을 확대하고 실제 물건의 종류를 확인하세요.',recommendation:'물건 종류를 확인한 뒤 이동 경로와 주변 전선, 단단한 모서리를 살펴보세요.',supplement:'종류가 불확실한 항목은 참고 점수에 반영하지 않습니다.'});
+   continue;
+  }
+  if (item.object_type === 'electric_fan') {
+   hazards.push({object:item.object_type,object_label:'선풍기',instance_label:'선풍기 후보',risk_level:'LOW',bbox:item.bbox,description:'사진에서 선풍기 후보가 보입니다. 실제 선풍기인지 확인한 뒤 주변 환경을 살펴보세요.',recommendation:'받침이 안정적인지, 전원선이 이동 경로에 놓였는지 직접 확인하세요.',supplement:'사진만으로 가동 상태나 전선 손상을 확정할 수 없습니다.'});
+   continue;
+  }
   const condition=evidence(item.object_type,item.bbox);
   if (actualRoom && ['wet_floor','rug'].includes(item.object_type)) {
    const wet=item.object_type==='wet_floor';
@@ -42,11 +52,12 @@ export function offlineResult(detections,target,room,electrical=false,general=fa
    continue;
   }
   for(const rule of data.rules) {
-   if(rule.target_type!==target||rule.space_type!==actualRoom||rule.object_type!==item.object_type||rule.condition!==condition) continue;
-   const label=data.objectLabels[item.object_type]||item.object_type;
+   const ruleType=item.object_type==='desk'?'dining_table':item.object_type;
+   if(rule.target_type!==target||rule.space_type!==actualRoom||rule.object_type!==ruleType||rule.condition!==condition) continue;
+   const label=item.object_type==='desk'?'책상':data.objectLabels[item.object_type]||item.object_type;
    let description=general ? `${rule.reason}.` : `${rule.reason}. ${data.targetLabels[target]} 기준의 확인 항목입니다.`;
    let recommendation=rule.recommendation, supplement=rule.supplement, instance=label;
-   const profile=data.profiles[item.object_type];
+   const profile=data.profiles[item.object_type]||(item.object_type==='desk'?data.profiles.dining_table:null);
    const [x,y,w,h]=item.bbox;
    if(profile) {
     const pos=`사진 ${x+w/2<.35?'왼쪽':x+w/2>.65?'오른쪽':'중앙'}·${y+h/2<.35?'상단':y+h/2>.65?'하단':'중간'}`;
@@ -75,9 +86,10 @@ export function offlineResult(detections,target,room,electrical=false,general=fa
   hazards.push({object:item.object_type,object_label:label,instance_label:`${label} 낙하 여부 확인`,risk_level:'LOW',bbox:item.bbox,description:`사진 위쪽에서 ${label} 후보가 보입니다. 실제로 높은 곳이나 가구 가장자리에 놓였는지 확인하세요. 사진만으로 높이와 안정성은 판단할 수 없습니다.`,recommendation:'불안정하거나 가장자리에 놓였다면 떨어지지 않는 낮고 안정적인 위치로 옮기세요.',supplement:'주변에서 사람이 부딪히거나 잡아당길 가능성도 확인하세요.',accident:'낙하 가능 여부를 확인하세요.'});
  }
  hazards.sort((a,b)=>levels[b.risk_level]-levels[a.risk_level]);
- const high=hazards.filter(h=>h.risk_level==='HIGH').length;
- const score=hazards.length?Math.max(0,Math.min(high>=2?40:high?60:80,100-hazards.reduce((sum,h)=>sum+levels[h.risk_level],0))):null;
- return {scan_id:`local-${Date.now()}`,hazards,detected_objects:detections,safety_score:score,score_computable:!!hazards.length,explanation_pending:false,notice:actualRoom?(electrical?'물기·매트와 낙하 후보는 실제 상태를 확인해야 하며 탐지되지 않을 수 있습니다. 휴대폰 내 가구 및 전기설비 후보 분석입니다. 전선·멀티탭·플러그가 빠지거나 잘못 탐지될 수 있으니 현장을 반드시 확인하세요.':'가구 모서리가 탐지되지 않을 수 있으니 직접 확인하세요. 휴대폰 내 가구·일반 물건 점검입니다. 전선·콘센트·멀티탭·플러그는 탐지하지 못하므로 직접 확인하세요.'):'공간을 자동 판별하지 못해 점수를 산정하지 않았습니다. 공간을 직접 선택해 다시 점검하세요.'};
+ const scorable=hazards.filter(h=>h.risk_level!=='CHECK');
+ const high=scorable.filter(h=>h.risk_level==='HIGH').length;
+ const score=scorable.length?Math.max(0,Math.min(high>=2?40:high?60:80,100-scorable.reduce((sum,h)=>sum+levels[h.risk_level],0))):null;
+ return {scan_id:`local-${Date.now()}`,hazards,detected_objects:detections,safety_score:score,score_computable:!!scorable.length,explanation_pending:false,notice:actualRoom?(electrical?'추가 모델로 선풍기·의자·책상·테이블도 교차 확인합니다. 전선·멀티탭·플러그와 물건은 빠지거나 잘못 탐지될 수 있으니 실제 종류와 위험 상태를 직접 확인하세요.':'가구 모서리가 탐지되지 않을 수 있으니 직접 확인하세요. 휴대폰 내 가구·일반 물건 점검입니다. 전선·콘센트·멀티탭·플러그는 탐지하지 못하므로 직접 확인하세요.'):'공간을 자동 판별하지 못해 점수를 산정하지 않았습니다. 공간을 직접 선택해 다시 점검하세요.'};
 }
 
 // 공통 규칙만 사용하며 사용자나 공간을 추정하지 않습니다.
