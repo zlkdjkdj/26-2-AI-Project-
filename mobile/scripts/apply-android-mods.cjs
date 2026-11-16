@@ -4,7 +4,7 @@ const path = require('node:path');
 const { compileModsAsync, AndroidConfig } = require('expo/config-plugins');
 const projectRoot = path.resolve(__dirname, '..');
 let config = require('../app.json').expo;
-for (const name of ['withTailnetWebRTC', 'withStandaloneBundle']) {
+for (const name of ['withTailnetWebRTC', 'withStandaloneBundle', 'withPictureInPicture']) {
   config = require(`../plugins/${name}.cjs`)(config);
 }
 config = AndroidConfig.Version.withVersion(config);

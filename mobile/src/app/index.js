@@ -1,12 +1,18 @@
 import { router } from "expo-router";
-import { Text } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, Text } from "react-native";
+import WelcomeGuide, { hasSeenGuide, saveGuideSeen } from "../WelcomeGuide";
 import { Camera, ShieldCheck, Monitor } from "lucide-react-native";
 import { Page, PageHeader, Section } from "../appUi";
 import { Button, s } from "../ui";
 
 export default function ModeSelection() {
+  const [guideVisible, setGuideVisible] = useState(false);
+  useEffect(() => { let active=true; hasSeenGuide().then(seen => { if(active && !seen) setGuideVisible(true); }); return () => { active=false; }; }, []);
+  function closeGuide() { setGuideVisible(false); saveGuideSeen(); }
   return (
     <Page>
+      {guideVisible && <WelcomeGuide visible onClose={closeGuide} />}
       <PageHeader
         title="앗차차"
         description="집을 더 안전하게. 홈캠과 사진 안전점검을 선택하세요."
@@ -38,6 +44,7 @@ export default function ModeSelection() {
         </Button>
       </Section>
 
+      <Pressable accessibilityRole="button" onPress={() => setGuideVisible(true)}><Text style={s.text}>앗차차 시작 가이드 다시 보기 →</Text></Pressable>
       <Text style={s.footnote}>
         홈캠에는 Tailscale이 필요합니다. 휴대폰 사진 점검은 모델 설치 후 오프라인으로 사용할 수 있어요.
       </Text>

@@ -173,15 +173,15 @@ export function Progress({ labels, current }) {
     </View>
   );
 }
-export function Player({ children, controls, note }) {
+export function Player({ children, controls, note, compact = false }) {
   return (
-    <SafeAreaView style={a.player}>
+    <SafeAreaView style={a.player} edges={compact ? [] : undefined}>
       <StatusBar style="light" />
       <View style={a.video}>{children}</View>
-      <View style={a.controls}>
+      {!compact && <View style={a.controls}>
         {note && <Text style={a.playerNote}>{note}</Text>}
         {controls}
-      </View>
+      </View>}
     </SafeAreaView>
   );
 }

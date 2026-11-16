@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
@@ -7,67 +7,20 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import * as SecureStore from "expo-secure-store";
 import * as ImagePicker from "expo-image-picker";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import { File } from "expo-file-system";
-import { fetch as expoFetch } from "expo/fetch";
-import { serverAddress } from "./api";
-import { isTailnet } from "./directProtocol";
-import { scoreMessage } from "./scanFeedback";
+import { overallFeedback, scoreMessage } from "./scanFeedback";
 import { colors as c, fonts as f } from "./ui";
 import { Enter, PageHeader, Progress, Notice } from "./appUi";
-import { PHOTO_SERVER_STORAGE } from "./photoConnection";
 import { useReducedMotion } from "./introMotion";
 import Bridge from "../modules/homecam-bridge";
-import { offlineResult } from "./offlineSafety";
+import { generalOfflineResult } from "./offlineSafety";
+import ZoomPhoto from "./ZoomPhoto";
 
-const targets = {
-  elderly: "노약자",
-  toddler: "영유아",
-  newborn: "신생아",
-  wheelchair: "휠체어 사용자",
-  limited_mobility: "거동 불편자",
-};
-const rooms = {
-  auto: "자동 확인",
-  living_room: "거실",
-  bedroom: "침실",
-  kitchen: "주방",
-  bathroom: "욕실",
-  entrance: "현관",
-  hallway: "복도",
-  stairs: "계단",
-};
 const levels = { HIGH: "고위험", MEDIUM: "중위험", LOW: "저위험" };
 
-function Choice({ items, value, onChange, disabled = false }) {
-  return (
-    <View style={s.choices}>
-      {Object.entries(items).map(([key, label]) => (
-        <Pressable
-          key={key}
-          accessibilityRole="button"
-          accessibilityState={{ selected: value === key, disabled }}
-          disabled={disabled}
-          onPress={() => onChange(key)}
-          style={[
-            s.chip,
-            value === key && s.selected,
-            disabled && { opacity: 0.6 },
-          ]}
-        >
-          <Text style={[s.chipText, value === key && s.selectedText]}>
-            {label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
 function Button({ title, onPress, disabled, secondary }) {
   return (
     <Pressable
@@ -89,44 +42,21 @@ function Button({ title, onPress, disabled, secondary }) {
   );
 }
 
-export default function PhotoScan({ initialServer, onBack }) {
+export default function PhotoScan({ onBack }) {
   const scroll = useRef(null);
   const recommendationY = useRef(0);
   const reduced = useReducedMotion();
   const [selectedHazard, setSelectedHazard] = useState(0);
-  const [server, setServer] = useState(initialServer || "");
-  const [mode, setMode] = useState("offline");
+  const [showAllBoxes, setShowAllBoxes] = useState(true);
+  const [zoomVisible, setZoomVisible] = useState(false);
   const [modelReady, setModelReady] = useState(null);
   const [electricalReady, setElectricalReady] = useState(null);
-  const [includeElectrical, setIncludeElectrical] = useState(false);
+  const [includeElectrical, setIncludeElectrical] = useState(true);
   const [electricalSupported, setElectricalSupported] = useState(null);
-  const [serverReady, setServerReady] = useState(() => {
-    try { return isTailnet(new URL(serverAddress(initialServer || "")).hostname); } catch { return false; }
-  });
   const [photo, setPhoto] = useState(null);
-  const [target, setTarget] = useState("elderly");
-  const [room, setRoom] = useState("living_room");
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const jsonRequest = useCallback(
-    async (path, options = {}) => {
-      const response = await expoFetch(`${serverAddress(server)}${path}`, {
-        ...options,
-        credentials: "omit",
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          typeof data.detail === "string"
-            ? data.detail
-            : "입력값 또는 서버 상태를 확인해 주세요.",
-        );
-      }
-      return data;
-    },
-    [server],
-  );
   useEffect(() => {
     let active = true;
     Bridge.offlineModelReady().then((ready) => { if (active) setModelReady(ready); }).catch(() => { if (active) setModelReady(false); });
@@ -148,7 +78,7 @@ export default function PhotoScan({ initialServer, onBack }) {
   }
   async function downloadElectrical() {
     setBusy(true); setError("");
-    try { await Bridge.downloadElectricalModel(); setElectricalReady(true); setIncludeElectrical(false); }
+    try { await Bridge.downloadElectricalModel(); setElectricalReady(true); setIncludeElectrical(true); }
     catch (e) { setError(e.message || "전기 탐지 모델 다운로드에 실패했습니다."); }
     finally { setBusy(false); }
   }
@@ -157,16 +87,6 @@ export default function PhotoScan({ initialServer, onBack }) {
     try { await Bridge.removeElectricalModel(); setElectricalReady(false); }
     catch (e) { setError(e.message || "전기 탐지 모델을 삭제하지 못했습니다."); }
     finally { setBusy(false); }
-  }
-  async function connectServer() {
-    setError("");
-    try {
-      const address = serverAddress(server);
-      if (!isTailnet(new URL(address).hostname))
-        throw new Error("코드 없이 이용하려면 PC의 Tailscale 주소를 입력하세요.");
-      await SecureStore.setItemAsync(PHOTO_SERVER_STORAGE, address);
-      setServerReady(true);
-    } catch (e) { setError(e.message); }
   }
   async function selectPhoto(camera) {
     setError("");
@@ -199,30 +119,14 @@ export default function PhotoScan({ initialServer, onBack }) {
   async function analyze() {
     if (!photo || busy) return;
     setSelectedHazard(0);
+    setShowAllBoxes(true);
     setBusy(true);
     setError("");
     try {
-      if (mode === "offline") {
-        const detections = await Bridge.detectOfflinePhoto(photo.uri);
-        const useElectrical = electricalReady && includeElectrical;
-        if (useElectrical) detections.push(...await Bridge.detectElectricalPhoto(photo.uri));
-        setResult(offlineResult(detections, target, room, useElectrical));
-        return;
-      }
-      const data = new FormData();
-      data.append("file", new File(photo.uri), "mobile-room.jpg");
-      data.append("target_type", target);
-      data.append("space_type", room);
-      data.append("space_name", "우리집");
-      data.append("save_image", "false");
-      data.append("defer_explanation", "false");
-      setResult(
-        await jsonRequest("/api/analyze/image", {
-          method: "POST",
-          headers: { "X-Atchacha-Photo": "1" },
-          body: data,
-        }),
-      );
+      const detections = await Bridge.detectOfflinePhoto(photo.uri);
+      const useElectrical = electricalReady && includeElectrical;
+      if (useElectrical) detections.push(...await Bridge.detectElectricalPhoto(photo.uri));
+      setResult(generalOfflineResult(detections, useElectrical));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -230,42 +134,15 @@ export default function PhotoScan({ initialServer, onBack }) {
     }
   }
   useEffect(() => {
-    if (!result?.explanation_pending) return;
-    let active = true;
-    let pending = false;
-    const id = setInterval(async () => {
-      if (pending) return;
-      pending = true;
-      try {
-        const data = await jsonRequest(`/api/scans/${result.scan_id}`);
-        if (active)
-          setResult((old) =>
-            old?.scan_id === data.scan_id
-              ? {
-                  ...old,
-                  explanation: data.explanation,
-                  explanation_pending: data.explanation_pending,
-                }
-              : old,
-          );
-      } catch {
-      } finally {
-        pending = false;
-      }
-    }, 3000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [jsonRequest, result?.scan_id, result?.explanation_pending]);
-  useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
   }, [result?.scan_id]);
   const showResult = !!result;
   const hazards = result?.hazards || [];
   const selected = hazards[selectedHazard];
+  const overall = result ? overallFeedback(result) : null;
   function chooseHazard(index) {
     setSelectedHazard(index);
+    setShowAllBoxes(false);
     scroll.current?.scrollTo({
       y: Math.max(0, recommendationY.current - 16),
       animated: !reduced,
@@ -298,56 +175,30 @@ export default function PhotoScan({ initialServer, onBack }) {
           />
           <Progress
             labels={["분석 준비", "사진 점검", "결과 확인"]}
-            current={(mode === "offline" ? !modelReady : !serverReady) ? 0 : showResult ? 2 : 1}
+            current={!modelReady ? 0 : showResult ? 2 : 1}
           />
           {!!error && <Notice tone="error">{error}</Notice>}
-          {!showResult && <View style={s.row}>
-            <Button secondary={mode !== "offline"} title="휴대폰에서 분석" disabled={busy} onPress={() => { setMode("offline"); setError(""); }} />
-            <Button secondary={mode !== "server"} title="PC 서버로 분석" disabled={busy} onPress={() => { setMode("server"); setError(""); }} />
-          </View>}
-          {mode === "offline" && !modelReady ? (
+          {!modelReady ? (
             <View style={s.card}>
               <Text style={s.heading}>가구 점검 모델 추가</Text>
-              <Text style={s.note}>약 13MB를 한 번 다운로드하면 이후 PC와 인터넷 없이 휴대폰에서 가구와 일반 물건을 분석합니다. 전기 위험 점검은 아래에서 별도로 다운로드할 수 있습니다.</Text>
+              <Text style={s.note}>약 45MB를 한 번 다운로드하면 이후 PC와 인터넷 없이 휴대폰에서 가구와 일반 물건을 분석합니다. 전기 위험 점검은 아래에서 별도로 다운로드할 수 있습니다.</Text>
               <Button title={modelReady === null ? "모델 확인 중…" : busy ? "모델 다운로드 중…" : "가구 점검 모델 다운로드"} onPress={downloadModel} disabled={busy || modelReady === null} />
               <Text style={s.note}>다운로드 시 데이터가 사용됩니다. 사진은 기기 밖으로 전송하지 않습니다.</Text>
-            </View>
-          ) : mode === "server" && !serverReady ? (
-            <View style={s.card}>
-              <Text style={s.heading}>사진 분석 서버 연결</Text>
-              <Text style={s.note}>
-                PC와 휴대폰에서 Tailscale을 켜고 PC 서버 주소를 입력하세요. 주소는 이 기기에 저장됩니다.
-              </Text>
-              <Text style={s.label}>PC 서버 주소</Text>
-              <TextInput
-                accessibilityLabel="사진 분석 PC 서버 주소"
-                style={s.input}
-                value={server}
-                onChangeText={setServer}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                placeholder="http://100.x.x.x:8000"
-                editable={!busy}
-              />
-              <Button title="서버 주소 저장" onPress={connectServer} disabled={!server.trim()} />
             </View>
           ) : !showResult ? (
             <>
               <View style={s.card}>
-                {mode === "server" ? <><Text style={s.note}>PC 분석 서버 · {server}</Text><Button secondary title="서버 주소 변경" onPress={() => setServerReady(false)} disabled={busy} /></> : <>
                   <Text style={s.note}>휴대폰 분석 · 모델을 받은 뒤 인터넷 없이 사진을 분석합니다.</Text>
                   <Button secondary title="가구 모델 삭제" onPress={removeModel} disabled={busy} />
-                  <Text style={s.heading}>전선·멀티탭·플러그 점검</Text>
-                  {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 현재 전기 시험 모델의 메모리가 부족합니다. 전기 점검은 PC 서버로 분석해 주세요. 기기용 경량 모델은 개발 중입니다.</Text> : electricalReady ? <>
-                    <Text style={s.note}>{includeElectrical ? "전기 위험 후보를 함께 찾습니다. 오래 걸릴 수 있습니다." : "현재 가구만 점검합니다. 전기설비는 확인되지 않습니다."}</Text>
-                    <Button secondary title={includeElectrical ? "전기 점검 끄기" : "전기 점검 켜기"} onPress={() => setIncludeElectrical(!includeElectrical)} disabled={busy} />
+                  <Text style={s.heading}>전기설비·바닥 위험 후보 점검</Text>
+                  {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 전기 점검 모델을 실행하기에 메모리가 부족합니다. 전선과 멀티탭은 직접 확인해 주세요.</Text> : electricalReady ? <>
+                    <Text style={s.note}>{includeElectrical ? "전기설비와 물기·매트 후보를 함께 찾습니다. 오래 걸릴 수 있습니다." : "현재 가구만 점검합니다. 전기설비는 확인되지 않습니다."}</Text>
+                    <Button secondary title={includeElectrical ? "추가 점검 끄기" : "추가 점검 켜기"} onPress={() => setIncludeElectrical(!includeElectrical)} disabled={busy} />
                     <Button secondary title="전기 모델 삭제" onPress={removeElectrical} disabled={busy} />
                   </> : <>
                     <Text style={s.note}>실험용 전기 모델을 약 204MB 추가로 받습니다. 높은 메모리를 사용하며 분석에 오래 걸릴 수 있습니다.</Text>
-                    <Button secondary title={busy ? "전기 모델 다운로드 중…" : "전기 위험 모델 다운로드"} onPress={downloadElectrical} disabled={busy || electricalReady === null || electricalSupported === null} />
+                    <Button secondary title={busy ? "전기 모델 다운로드 중…" : "추가 위험 모델 다운로드"} onPress={downloadElectrical} disabled={busy || electricalReady === null || electricalSupported === null} />
                   </>}
-                </>}
                 <Text style={s.heading}>공간 사진</Text>
                 {photo ? (
                   <PhotoPreview photo={photo} />
@@ -375,21 +226,6 @@ export default function PhotoScan({ initialServer, onBack }) {
                 </View>
               </View>
               <View style={s.card}>
-                <Text style={s.heading}>누구와 어떤 공간인가요?</Text>
-                <Text style={s.label}>사용 대상</Text>
-                <Choice
-                  items={targets}
-                  value={target}
-                  onChange={setTarget}
-                  disabled={busy}
-                />
-                <Text style={s.label}>공간</Text>
-                <Choice
-                  items={rooms}
-                  value={room}
-                  onChange={setRoom}
-                  disabled={busy}
-                />
                 <Button
                   title={busy ? "사진을 분석하고 있어요…" : "안전점검 시작"}
                   onPress={analyze}
@@ -401,7 +237,7 @@ export default function PhotoScan({ initialServer, onBack }) {
                   </Notice>
                 )}
                 <Text style={s.note}>
-                  {mode === "offline" ? "사진과 결과는 분석을 위해 외부로 전송하지 않습니다." : "점검 사진은 서버에 보관하지 않습니다. 분석 결과는 기존 보관 설정을 따릅니다."}
+                  사진과 결과는 분석을 위해 외부로 전송하지 않습니다.
                 </Text>
               </View>
             </>
@@ -420,29 +256,47 @@ export default function PhotoScan({ initialServer, onBack }) {
                   확인 항목 {hazards.length}개
                 </Text>
               </View>
+              <View style={s.card}>
+                <Text style={s.heading}>종합 안전 피드백</Text>
+                <Text style={s.body}>{overall.summary}</Text>
+                {overall.actions.map((action, index) => (
+                  <View key={`${action.label}-${index}`}>
+                    <Text style={s.label}>{index + 1}. {action.label}</Text>
+                    <Text style={s.advice}>{action.text}</Text>
+                  </View>
+                ))}
+                <Text style={s.note}>사진에서 찾은 후보를 바탕으로 정리한 안내입니다. 실제 위험 여부와 사진에 보이지 않는 곳은 직접 확인해 주세요.</Text>
+              </View>
+              {zoomVisible && photo && <ZoomPhoto photo={photo} hazards={hazards} selected={selectedHazard} initialMode={showAllBoxes ? "all" : "selected"} onClose={() => setZoomVisible(false)} />}
               {photo && (
                 <PhotoPreview
                   photo={photo}
                   hazards={hazards}
                   selected={selectedHazard}
+                  showAll={showAllBoxes}
                   onSelect={chooseHazard}
+                  onZoom={() => setZoomVisible(true)}
                 />
               )}
+              <Button title="사진 확대해서 보기" secondary onPress={() => setZoomVisible(true)} />
               <Text style={s.note}>{result.notice}</Text>
               {!!hazards.length && (
                 <View style={s.choices}>
+                  <Pressable accessibilityRole="button" accessibilityState={{ selected: showAllBoxes }} onPress={() => setShowAllBoxes(true)} style={[s.chip, showAllBoxes && s.selected]}>
+                    <Text style={[s.chipText, showAllBoxes && s.selectedText]}>전체 박스 보기</Text>
+                  </Pressable>
                   {hazards.map((h, i) => (
                     <Pressable
                       key={h.id || i}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: selectedHazard === i }}
-                      onPress={() => setSelectedHazard(i)}
-                      style={[s.chip, selectedHazard === i && s.selected]}
+                      accessibilityState={{ selected: !showAllBoxes && selectedHazard === i }}
+                      onPress={() => { setSelectedHazard(i); setShowAllBoxes(false); }}
+                      style={[s.chip, !showAllBoxes && selectedHazard === i && s.selected]}
                     >
                       <Text
                         style={[
                           s.chipText,
-                          selectedHazard === i && s.selectedText,
+                          !showAllBoxes && selectedHazard === i && s.selectedText,
                         ]}
                       >
                         {i + 1}. {h.instance_label || h.object_label} ·{" "}
@@ -500,7 +354,7 @@ export default function PhotoScan({ initialServer, onBack }) {
                 </Notice>
               )}
               <Button
-                title="사진·대상 설정으로 돌아가기"
+                title="사진 선택으로 돌아가기"
                 secondary
                 onPress={() => {
                   setResult(null);
@@ -524,7 +378,7 @@ export default function PhotoScan({ initialServer, onBack }) {
     </KeyboardAvoidingView>
   );
 }
-function PhotoPreview({ photo, hazards = [], selected = -1, onSelect }) {
+function PhotoPreview({ photo, hazards = [], selected = -1, showAll = true, onSelect, onZoom }) {
   return (
     <View
       style={{
@@ -535,14 +389,12 @@ function PhotoPreview({ photo, hazards = [], selected = -1, onSelect }) {
         overflow: "hidden",
       }}
     >
-      <Image
-        source={{ uri: photo.uri }}
-        style={StyleSheet.absoluteFill}
-        resizeMode="stretch"
-      />
+      <Pressable onPress={onZoom} disabled={!onZoom} accessibilityRole="button" accessibilityLabel="사진 확대해서 보기" style={StyleSheet.absoluteFill}>
+        <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} resizeMode="stretch" />
+      </Pressable>
       {hazards.map(
         (h, i) =>
-          h.bbox?.length === 4 && (
+          h.bbox?.length === 4 && (showAll || i === selected) && (
             <Pressable
               key={h.id || i}
               accessibilityRole="button"

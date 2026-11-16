@@ -29,10 +29,22 @@ export default function CameraScreen() {
   const [streaming, setStreaming] = useState(false);
   const [busy, setBusy] = useState(true);
   const [prepared, setPrepared] = useState(false);
+  const [fallRecording, setFallRecording] = useState(false);
+  const [events, setEvents] = useState([]);
   const identity = useRef(null);
   const alive = useRef(true);
   const stop = useCallback(() => setStreaming(false), []);
   usePlayerBack(streaming, stop);
+
+  const refreshEvents = useCallback(async () => {
+    try { setEvents((await Bridge.listFallEvents()).filter(item => item.name.startsWith("event_"))); }
+    catch (error) { setMessage(error.message || "저장 영상을 불러오지 못했습니다."); }
+  }, []);
+  useEffect(() => {
+    if (streaming) return;
+    const timer = setTimeout(() => { refreshEvents(); }, 0);
+    return () => clearTimeout(timer);
+  }, [streaming, refreshEvents]);
 
   useEffect(() => {
     let active = true;
@@ -181,7 +193,7 @@ export default function CameraScreen() {
           </Button>
         }
       >
-        <DirectVideo camera onStop={stop} fit="contain" />
+        <DirectVideo camera onStop={stop} fit="contain" fallRecording={fallRecording} />
       </Player>
     );
   return (
@@ -244,6 +256,24 @@ export default function CameraScreen() {
           카메라 권한 설정 열기
         </Button>
       )}
+      <Section title="낙상 의심 영상 기록 · 실험 기능" subtitle="촬영 시작 전에 켜면 자세가 급격히 변한 경우 전후 약 8초를 이 기기에 저장합니다.">
+        <Text style={s.text}>촬영 화면을 켜 둔 동안 작동합니다. 사람의 자세와 카메라 각도에 따라 놓치거나 잘못 기록할 수 있으며, 자동 신고나 긴급 알림은 제공하지 않습니다.</Text>
+        <Button secondary onPress={() => setFallRecording(value => !value)}>
+          {fallRecording ? "낙상 의심 기록 끄기 · 현재 켜짐" : "낙상 의심 기록 켜기 · 현재 꺼짐"}
+        </Button>
+        <Text style={s.footnote}>최대 20개를 저장합니다. 꽉 차면 기존 영상을 삭제해야 새 영상을 저장합니다. 영상은 이 휴대폰의 앱 내부에 보관되며 소리는 녹음하지 않습니다.</Text>
+      </Section>
+      <Section title={`저장된 의심 영상 ${events.length}개`} subtitle="영상은 촬영용 휴대폰에서 확인하고 삭제할 수 있습니다.">
+        {events.length === 0 && <Text style={s.text}>저장된 영상이 없습니다.</Text>}
+        {events.map(event => <View key={event.name} style={{ gap: 8 }}>
+          <Text style={s.text}>{new Date(event.createdAt).toLocaleString()} · {(event.size / 1048576).toFixed(1)} MB</Text>
+          <View style={s.row}>
+            <View style={{ flex: 1 }}><Button fixed secondary onPress={async () => { try { await Bridge.openFallEvent(event.name); } catch (error) { setMessage(error.message || "영상을 열지 못했습니다."); } }}>영상 보기</Button></View>
+            <View style={{ flex: 1 }}><Button fixed danger onPress={() => confirmAction("이 영상을 삭제할까요?", "삭제한 영상은 복구할 수 없습니다.", async () => { try { await Bridge.deleteFallEvent(event.name); await refreshEvents(); } catch (error) { setMessage(error.message || "삭제하지 못했습니다."); } })}>삭제</Button></View>
+          </View>
+        </View>)}
+        <Button secondary onPress={refreshEvents}>목록 새로고침</Button>
+      </Section>
       <Section
         title="연결이 안 될 때"
         subtitle="두 휴대폰에서 같은 계정의 Tailscale을 켜 주세요. 연결을 확인한 뒤 다시 시도할 수 있어요."
@@ -253,8 +283,7 @@ export default function CameraScreen() {
         </Button>
       </Section>
       <Text style={s.footnote}>
-        등록 후에는 장소가 달라도 볼 수 있습니다. PC는 필요하지 않으며 소리와
-        영상을 저장하지 않습니다.
+        등록 후에는 장소가 달라도 볼 수 있습니다. PC는 필요하지 않으며 소리는 저장하지 않습니다.
       </Text>
       {host && (
         <Button

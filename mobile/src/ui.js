@@ -25,6 +25,7 @@ export function Button({
   disabled,
   danger,
   icon: Icon,
+  fixed,
 }) {
   return (
     <Pressable
@@ -34,6 +35,7 @@ export function Button({
       disabled={disabled}
       style={({ pressed }) => [
         s.button,
+        fixed && { height: 52, minHeight: 52 },
         secondary && s.secondary,
         danger && s.danger,
         pressed && !disabled && { transform: [{ scale: 0.97 }], opacity: 0.85 },
@@ -48,6 +50,8 @@ export function Button({
         />
       )}
       <Text
+        numberOfLines={fixed ? 1 : undefined}
+        adjustsFontSizeToFit={!!fixed}
         style={[
           s.buttonText,
           secondary && { color: colors.link },

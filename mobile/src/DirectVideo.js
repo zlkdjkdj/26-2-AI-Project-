@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   MediaStream,
@@ -19,6 +19,16 @@ import { advancePersonTrack } from "./personTracking";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let detectionQueue = Promise.resolve();
+let fallQueue = Promise.resolve();
+let manualQueue = Promise.resolve();
+const queueManual = (operation) => {
+  manualQueue = manualQueue.catch(() => {}).then(operation);
+  return manualQueue;
+};
+const queueFall = (operation) => {
+  fallQueue = fallQueue.catch(() => {}).then(operation);
+  return fallQueue;
+};
 const queueDetection = (operation) => {
   detectionQueue = detectionQueue.catch(() => {}).then(operation);
   return detectionQueue;
@@ -40,22 +50,52 @@ async function description(peer) {
 }
 
 // Each mounted session owns and closes its peer and media tracks.
-export default function DirectVideo({
+const DirectVideo = forwardRef(function DirectVideo({
   camera,
   connection,
   fit = "contain",
   onStop,
-}) {
+  fallRecording = false,
+  rotation = 0,
+  compact = false,
+}, ref) {
   useKeepAwake();
   const [stream, setStream] = useState(null);
   const [message, setMessage] = useState("영상 준비 중…");
   const [person, setPerson] = useState(null);
   const [viewport, setViewport] = useState(null);
   const [detectionMessage, setDetectionMessage] = useState("");
+  const [fallMessage, setFallMessage] = useState("");
   const trackRef = useRef(null);
   const cameraTrack = useRef(null);
   const switchingCamera = useRef(false);
   const [frontCamera, setFrontCamera] = useState(false);
+  useImperativeHandle(ref, () => ({
+    async startRecording() {
+      if (camera || !stream) throw new Error("영상 연결 후 녹화할 수 있습니다.");
+      await queueManual(() => Bridge.startManualRecorder(stream.toURL()));
+    },
+    stopRecording() { Bridge.finishManualRecording(); },
+    recordingStatus() { return Bridge.manualRecorderStatus(); },
+  }), [camera, stream]);
+  useEffect(() => {
+    if (camera || !stream) return;
+    return () => { queueManual(() => Bridge.stopManualRecorder()).catch(() => {}); };
+  }, [camera, stream]);
+  useEffect(() => {
+    if (!camera || !stream || !fallRecording) return;
+    let active = true, timer;
+    const poll = () => {
+      if (!active) return;
+      try { setFallMessage(Bridge.fallRecorderStatus()); }
+      catch { setFallMessage("낙상 의심 감지 사용 불가"); }
+      timer = setTimeout(poll, 1000);
+    };
+    queueFall(() => Bridge.startFallRecorder(stream.toURL()))
+      .then(() => { if (active) poll(); })
+      .catch(() => { if (active) setFallMessage("낙상 의심 감지를 시작하지 못했어요"); });
+    return () => { active = false; clearTimeout(timer); queueFall(() => Bridge.stopFallRecorder()).catch(() => {}); };
+  }, [camera, stream, fallRecording]);
   useEffect(() => {
     if (camera || !stream) return;
     let active = true, timer, lastPoll = Date.now();
@@ -98,9 +138,18 @@ export default function DirectVideo({
         signal: controller.signal,
         ...options,
       });
+    let backgroundTimer;
+    const checkBackground = () => {
+      if (!active || AppState.currentState === "active") return;
+      let pip = false;
+      try { pip = !camera && Bridge.isPictureInPicture(); } catch {}
+      if (!pip) onStop();
+    };
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state !== "active") onStop();
+      clearTimeout(backgroundTimer);
+      if (state !== "active") backgroundTimer = setTimeout(checkBackground, 700);
     });
+    const pipWatch = setInterval(checkBackground, 1500);
     const closePeer = () => {
       if (peer) {
         peer.close();
@@ -187,6 +236,8 @@ export default function DirectVideo({
     async function viewerStart() {
       clearTimeout(poll);
       clearTimeout(retry);
+      clearTimeout(backgroundTimer);
+      clearInterval(pipWatch);
       const attempt = ++generation;
       const oldOffer = offerId;
       offerId = "";
@@ -279,8 +330,16 @@ export default function DirectVideo({
       media?.getTracks().forEach((track) => track.stop());
     };
   }, [camera, connection, onStop]);
+  const turned = !camera && rotation % 180 !== 0;
+  const videoViewport = viewport && turned ? { width: viewport.height, height: viewport.width } : viewport;
+  const rotatedStyle = viewport && turned ? {
+    position: "absolute", width: viewport.height, height: viewport.width,
+    left: (viewport.width - viewport.height) / 2, top: (viewport.height - viewport.width) / 2,
+    transform: [{ rotate: `${rotation}deg` }],
+  } : [StyleSheet.absoluteFill, { transform: [{ rotate: `${rotation}deg` }] }];
   return (
     <View style={styles.video} onLayout={(event) => setViewport(event.nativeEvent.layout)}>
+      <View style={rotatedStyle}>
       {stream && (
         <RTCView
           streamURL={stream.toURL()}
@@ -289,6 +348,11 @@ export default function DirectVideo({
           mirror={camera && frontCamera}
         />
       )}
+      {!camera && stream && person && videoViewport && (() => {
+        const bounds = mapPersonBox(person, { width: person.frameWidth, height: person.frameHeight }, videoViewport, fit);
+        return bounds ? <View pointerEvents="none" style={[styles.personBox, bounds]}><Text style={styles.personLabel}>사람</Text></View> : null;
+      })()}
+      </View>
       {camera && stream && <Pressable accessibilityRole="button" accessibilityLabel="전면 후면 카메라 전환" style={styles.switchCamera} onPress={async () => {
         if (switchingCamera.current) return;
         const track = cameraTrack.current;
@@ -301,17 +365,15 @@ export default function DirectVideo({
         } catch (error) { if (cameraTrack.current === track) setMessage(error.message || "카메라를 전환하지 못했습니다."); }
         finally { switchingCamera.current = false; }
       }}><Text style={styles.switchText}>전면 · 후면 전환</Text></Pressable>}
-      {!camera && stream && person && viewport && (() => {
-        const bounds = mapPersonBox(person, { width: person.frameWidth, height: person.frameHeight }, viewport, fit);
-        return bounds ? <View pointerEvents="none" style={[styles.personBox, bounds]}><Text style={styles.personLabel}>사람</Text></View> : null;
-      })()}
-      {!camera && stream && !!detectionMessage && <Text pointerEvents="none" style={styles.detectionStatus}>{detectionMessage}</Text>}
-      <View style={styles.status}>
+      {!compact && !camera && stream && !!detectionMessage && <Text pointerEvents="none" style={styles.detectionStatus}>{detectionMessage}</Text>}
+      {camera && stream && fallRecording && <Text pointerEvents="none" style={styles.detectionStatus}>{fallMessage || "낙상 의심 감지 준비 중"}</Text>}
+      {!compact && <View style={styles.status}>
         <Text style={styles.text}>{message}</Text>
-      </View>
+      </View>}
     </View>
   );
-}
+});
+export default DirectVideo;
 const styles = StyleSheet.create({
   video: { flex: 1, backgroundColor: "#191b20", overflow: "hidden" },
   status: {
