@@ -71,7 +71,9 @@ PIP, 갤러리 저장과 낙상 의심 기록은 기기별 실사용 검수가 �
 
 ## 어떻게 작동하나요
 
-![앗차차 기술 스택과 모바일 서비스 구조](docs/images/atchacha-service-architecture.png)
+> **참고 이미지:** 아래 구조도는 서비스 개념을 나타냅니다. 그림의 영유아 구분과 실시간 이벤트 데이터 전송은 현재 구현되어 있지 않습니다.
+
+![앗차차 상세 기술 구조 참고 이미지](docs/images/atchacha-architecture-reference.png)
 
 ### 사진 안전점검
 
@@ -90,7 +92,9 @@ PIP, 갤러리 저장과 낙상 의심 기록은 기기별 실사용 검수가 �
 
 ### 휴대폰 간 홈캠
 
-![사진 분석과 홈캠 연결의 처리 흐름](docs/images/atchacha-safety-homecam-flow.png)
+> **기획 참고 이미지:** 아래 그림의 위험 구역 접근 감지, 보호자 푸시 경보, 개선 전후 비교 및 체크리스트 피드백은 현재 구현되어 있지 않습니다. 실제 제공 기능은 아래 설명을 확인해 주세요.
+
+![앗차차 서비스 흐름 기획 참고 이미지](docs/images/atchacha-service-flow-reference.png)
 
 ```text
 촬영용 휴대폰 ── 일회용 QR 등록 ── 모니터링 휴대폰
