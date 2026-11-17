@@ -5,15 +5,18 @@ import { overallFeedback, scoreMessage } from "@shared/scanFeedback.js";
 import { detectPhoto, downloadModel, modelReady, removeModel } from "./detector.js";
 
 const LEVEL = { HIGH: "고위험", MEDIUM: "중위험", LOW: "저위험", CHECK: "종류 확인" };
-const COLOR = { HIGH: "#d70015", MEDIUM: "#ff9500", LOW: "#0071e3", CHECK: "#8e8e93" };
+const COLOR = { HIGH: "#dc2626", MEDIUM: "#c2680a", LOW: "#0a66d0", CHECK: "#6b6b70" };
 
+// 탐지 박스는 앗차차의 표식처럼 네 모서리만 그려 사진을 덜 가린다.
 function Overlay({ hazards, selected, showAll }) {
   return (
     <svg className="overlay" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-      {hazards.map((h, i) => (showAll || i === selected) && (
-        <rect key={i} x={h.bbox[0]} y={h.bbox[1]} width={h.bbox[2]} height={h.bbox[3]}
-          fill="none" stroke={COLOR[h.risk_level]} strokeWidth="3" vectorEffect="non-scaling-stroke" />
-      ))}
+      {hazards.map((h, i) => {
+        if (!showAll && i !== selected) return null;
+        const [x, y, w, d] = h.bbox, lx = Math.min(w * 0.3, 0.06), ly = Math.min(d * 0.3, 0.06);
+        const path = `M${x} ${y + ly}V${y}H${x + lx} M${x + w - lx} ${y}H${x + w}V${y + ly} M${x + w} ${y + d - ly}V${y + d}H${x + w - lx} M${x + lx} ${y + d}H${x}V${y + d - ly}`;
+        return <path key={i} d={path} fill="none" stroke={COLOR[h.risk_level]} strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />;
+      })}
     </svg>
   );
 }
