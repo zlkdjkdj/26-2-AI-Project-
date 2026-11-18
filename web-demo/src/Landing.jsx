@@ -193,6 +193,7 @@ export default function Landing({ onStart }) {
           <div className="row cta">
             <button className="btn light" onClick={() => onStart("photo")}>사진 점검 체험하기</button>
             <button className="btn secondary" onClick={() => onStart("homecam")}>홈캠 둘러보기</button>
+            <button className="btn secondary" onClick={() => onStart("feedback")}>평가 남기기</button>
           </div>
         </div>
       </section>

@@ -13,6 +13,15 @@ export const Lock = make(["M5 11h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-
 export const Download = make(["M12 3v12", "m7 11 5 5 5-5", "M5 21h14"]);
 export const Menu = make(["M4 7h16", "M4 12h16", "M4 17h16"]);
 
+// 평점 별: 선택된 별만 채운다.
+export function Star({ filled, size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3.2l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9.6l6-.9L12 3.2z" />
+    </svg>
+  );
+}
+
 // 앗차차의 표식: 탐지 박스의 네 모서리. 로고, 히어로 프레임, 사진 위 탐지 박스에만 쓴다.
 export function Brackets({ size = 20 }) {
   return (

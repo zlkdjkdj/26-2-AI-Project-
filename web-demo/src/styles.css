@@ -195,3 +195,14 @@ h1, h2, h3 { font-weight: 500; }
 }
 @media (max-width: 480px) { .phones { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .person { left: 40%; } }
+
+/* ---- 평가하기(구글폼 링크) ---- */
+.fb-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.fb-list li { display: flex; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.fb-list b { font-weight: 500; min-width: 96px; }
+.fb-list span { color: var(--text-2); }
+.fb-cta { align-self: flex-start; }
+.fb-notice { display: grid; grid-template-columns: 72px 1fr; gap: 8px 16px; margin: 0; }
+.fb-notice dt { color: var(--muted); font-size: 13px; line-height: 22px; }
+.fb-notice dd { margin: 0; }
+@media (max-width: 720px) { .fb-cta { align-self: stretch; } .fb-list li { flex-direction: column; gap: 2px; } }

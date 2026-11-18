@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import Landing, { DownloadButton } from "./Landing.jsx";
 import PhotoDemo from "./PhotoDemo.jsx";
 import HomecamDemo from "./HomecamDemo.jsx";
+import Feedback from "./Feedback.jsx";
 import { Brackets, Menu } from "./icons.jsx";
 
 const links = [
   ["home", "서비스 소개"],
   ["photo", "사진 점검 체험"],
   ["homecam", "홈캠 체험"],
+  ["feedback", "평가하기"],
 ];
-const views = ["home", "photo", "homecam"];
+const views = ["home", "photo", "homecam", "feedback"];
 const fromHash = () => {
   const id = location.hash.replace("#/", "").replace("#", "");
   return views.includes(id) ? id : "home";
@@ -57,6 +59,7 @@ export default function App() {
         <div hidden={view !== "home"}><Landing onStart={go} /></div>
         <div hidden={view !== "photo"} className="narrow"><PhotoDemo /></div>
         <div hidden={view !== "homecam"} className="narrow"><HomecamDemo /></div>
+        <div hidden={view !== "feedback"} className="narrow"><Feedback /></div>
       </main>
       <footer className="foot">
         체험판입니다. 실제 앱(Android)에서는 휴대폰 두 대를 Tailscale로 연결하는 홈캠과 전기설비 추가 점검을 사용할 수 있습니다.
