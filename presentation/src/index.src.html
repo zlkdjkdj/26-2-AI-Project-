@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>앗차차 발표자료</title>
+<!-- 디자인 정리: unslop by Damir Sokolovsky (@heydamir), CC BY 4.0
+     방향: 차분하고 정확하며 약간 따뜻하게 / 생활 공간(가구, 창가 빛) / 포인트색 하나(브랜드 블루) / 시그니처는 탐지 박스와 스캐너 모서리 -->
+<style>
+@font-face { font-family: "SUIT"; src: url("assets/fonts-sub/SUIT-Regular.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "SUIT"; src: url("assets/fonts-sub/SUIT-Medium.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "SUIT"; src: url("assets/fonts-sub/SUIT-SemiBold.woff2") format("woff2"); font-weight: 600 900; }
+
+:root {
+  /* 밝은 면: graphite 램프 */
+  --bg: #ffffff; --raised: #f4f4f5; --hair: rgba(23,23,23,.08); --ink: #171717; --ink2: #525252; --muted: #737373;
+  --accent: #0a66d0; --accent-d: #084a99; --accent-t: #e8f1fc;
+  --pos: #16a34a; --warn: #b45309; --warn-t: #fbf1e2;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  font-family: "SUIT", "Malgun Gothic", system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0f0f10; overflow: hidden; color: var(--ink); }
+body { word-break: keep-all; overflow-wrap: break-word; }
+svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+#viewport { position: fixed; inset: 0; overflow: hidden; }
+#stage { width: 1920px; height: 1080px; position: absolute; left: 50%; top: 50%; transform-origin: center center; }
+.slide { position: absolute; inset: 0; background: var(--bg); padding: 96px 120px; display: none; flex-direction: column; overflow: hidden; }
+.slide.active { display: flex; animation: enter .4s var(--ease); }
+@keyframes enter { from { opacity: 0; transform: translateY(12px); } }
+.slide > * { position: relative; }
+/* 어두운 면: graphite 램프 */
+.slide.dark { --bg: #141415; --raised: #232325; --hair: rgba(237,237,237,.08); --ink: #ededed; --ink2: #a1a1a6; --muted: #85858b; --accent: #5aa5f5; background: #141415; color: var(--ink); }
+.dark .card { background: #19191b; }
+
+/* 타이포: 400 / 500 / 600 */
+.tag { font-size: 24px; line-height: 32px; font-weight: 500; color: var(--accent); display: flex; align-items: center; gap: 12px; }
+.tag b { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 20px; font-weight: 500; }
+.dark .tag b { background: var(--raised); color: var(--ink); }
+h1 { font-size: 192px; line-height: 1; font-weight: 500; letter-spacing: -.03em; }
+h2 { font-size: 72px; line-height: 1.16; font-weight: 500; letter-spacing: -.03em; margin-top: 16px; }
+h2 em { font-style: normal; color: var(--accent); }
+h3 { font-size: 36px; line-height: 1.3; font-weight: 500; }
+p { font-size: 28px; line-height: 1.5; color: var(--ink2); }
+b, strong { font-weight: 600; }
+.foot { position: absolute !important; left: 120px; right: 120px; bottom: 36px; font-size: 20px; line-height: 28px; color: var(--muted); display: flex; justify-content: space-between; }
+.accent { color: var(--accent); }
+
+/* 등장: 짧은 페이드 + 12px 상승, 항목 간 60ms */
+.slide.active [data-a] { animation: rise .5s var(--ease) both; animation-delay: calc(var(--i, 0) * 60ms + 150ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+
+/* 면 */
+.card { border-radius: 20px; background: #fff; border: 1px solid var(--hair); padding: 32px; }
+.card.fill { background: var(--raised); border-color: transparent; }
+.card.acc { background: var(--accent); border-color: transparent; color: #fff; }
+.card.acc p, .card.acc h3 { color: #fff; }
+.card.warn { background: var(--warn-t); border-color: transparent; }
+.ico { width: 80px; height: 80px; border-radius: 16px; display: grid; place-items: center; background: var(--raised); color: var(--ink2); font-size: 40px; flex: none; }
+.ico.a { background: var(--accent-t); color: var(--accent); }
+.acc .ico { background: rgba(255,255,255,.16); color: #fff; }
+.dark .ico { background: var(--raised); color: var(--ink2); }
+.dark .ico.a { background: #1b2a3d; color: var(--accent); }
+.lb { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 8px; font-size: 24px; line-height: 32px; font-weight: 500; background: var(--raised); color: var(--ink2); }
+.lb.a { background: var(--accent-t); color: var(--accent-d); } .lb.p { background: #e6f4ea; color: #15703a; } .lb.w { background: var(--warn-t); color: var(--warn); }
+.dark .lb { background: var(--raised); color: var(--ink2); }
+.chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 12px; padding: 12px 20px; border-radius: 12px; font-size: 28px; line-height: 36px; font-weight: 500; background: #fff; border: 1px solid var(--hair); color: var(--ink); }
+.chip i { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex: none; }
+.chip.w i { background: var(--warn); } .chip.p i { background: var(--pos); } .chip.n i { background: var(--muted); }
+.card.fill .chip { background: #fff; }
+
+/* 시그니처: 스캐너 모서리 */
+.corners { position: absolute; inset: -12px; pointer-events: none; }
+.corners i { position: absolute; width: 40px; height: 40px; border: 0 solid var(--accent); }
+.corners i:nth-child(1) { left: 0; top: 0; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 12px; }
+.corners i:nth-child(2) { right: 0; top: 0; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 12px; }
+.corners i:nth-child(3) { right: 0; bottom: 0; border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 12px; }
+.corners i:nth-child(4) { left: 0; bottom: 0; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 12px; }
+
+/* 사진과 탐지 박스 */
+.photo { position: relative; border-radius: 20px; overflow: hidden; background: #000; }
+.photo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan { position: absolute; inset: 0; opacity: 0; }
+.scan::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #9ccbff; }
+.slide.active .scan { animation: sweep 2.2s var(--ease) .3s both; }
+@keyframes sweep { 0% { transform: translateY(-100%); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(0); opacity: 0; } }
+.box { position: absolute; border: 3px solid #5aa5f5; border-radius: 6px; }
+.box.w { border-color: #f0a24a; }
+.box b { position: absolute; left: -3px; top: -40px; padding: 4px 12px; border-radius: 6px 6px 6px 0; background: #5aa5f5; color: #0b1626; font-size: 24px; line-height: 32px; font-weight: 600; white-space: nowrap; }
+.box.w b { background: #f0a24a; }
+.slide.active .box { animation: boxin .4s var(--ease) both; animation-delay: calc(var(--d) * 1s + .5s); }
+@keyframes boxin { from { opacity: 0; transform: scale(1.04); } }
+
+/* 숫자·게이지·막대 */
+.num { font-weight: 500; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.num small { font-size: .4em; margin-left: 4px; letter-spacing: 0; font-weight: 500; }
+.ring { position: relative; width: 320px; height: 320px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 20; stroke-linecap: round; }
+.ring .bg { stroke: var(--raised); } .ring .fg { stroke: var(--accent); stroke-dasharray: 1131; stroke-dashoffset: calc(1131 * (1 - var(--p))); }
+.slide.active .ring .fg { animation: ring 1.6s var(--ease) .3s both; }
+@keyframes ring { from { stroke-dashoffset: 1131; } }
+.ring .c { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+
+.vchart { display: flex; align-items: flex-end; gap: 32px; height: 440px; padding: 0 16px; border-bottom: 1px solid var(--hair); }
+.vb { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 12px; height: 100%; }
+.vb .v { font-size: 36px; line-height: 44px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.vb .bar { width: 100%; height: var(--h); border-radius: 12px 12px 0 0; background: #d4d4d8; transform-origin: bottom; }
+.vb .bar.a { background: var(--accent); }
+.slide.active .vb .bar { animation: grow 1s var(--ease) both; animation-delay: calc(var(--i, 0) * 120ms + .4s); }
+@keyframes grow { from { transform: scaleY(0); } }
+.vlab { display: flex; gap: 32px; padding: 12px 16px 0; } .vlab span { flex: 1; text-align: center; font-size: 24px; line-height: 32px; color: var(--ink2); }
+
+/* 흐름도 */
+.pipe { display: flex; align-items: flex-start; position: relative; }
+.node { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 0 8px; position: relative; z-index: 1; }
+.node .ico { width: 120px; height: 120px; border-radius: 24px; font-size: 56px; }
+.node h3 { font-size: 32px; } .node p { font-size: 24px; line-height: 1.4; }
+.link { position: absolute; height: 2px; top: 59px; z-index: 0; background-image: linear-gradient(90deg, #c4c4c8 50%, transparent 50%); background-size: 16px 2px; }
+.dark .link { background-image: linear-gradient(90deg, #4a4a4f 50%, transparent 50%); }
+.slide.active .link { animation: march 1.2s linear infinite; }
+@keyframes march { to { background-position: 16px 0; } }
+
+/* 폰 */
+.phone { position: relative; border-radius: 48px; border: 12px solid #1c1c1e; background: #1c1c1e; box-shadow: 0 8px 24px rgba(0,0,0,.08); overflow: hidden; flex: none; }
+.dark .phone { border-color: #2a2a2d; background: #2a2a2d; box-shadow: none; }
+.phone .screen { border-radius: 36px; overflow: hidden; background: #fff; height: 100%; }
+.phone .screen > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.app { zoom: 1.6; padding: 28px 12px 12px; display: flex; flex-direction: column; gap: 8px; height: 100%; font-size: 10px; line-height: 14px; color: #171717; background: #fff; }
+.app-title { font-size: 20px; line-height: 24px; font-weight: 600; }
+.app-sub, .app-foot { color: #737373; }
+.app-eyebrow { color: var(--accent); font-weight: 500; }
+.app-h { font-size: 14px; line-height: 20px; font-weight: 600; }
+.app-card { background: #fff; border: 1px solid rgba(23,23,23,.1); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.app-card b { font-size: 12px; line-height: 16px; } .app-card p { font-size: 10px; line-height: 14px; color: #525252; }
+.app-btn { height: 28px; display: flex; align-items: center; justify-content: center; background: #0a66d0; color: #fff; border-radius: 8px; font-size: 10px; }
+.app-score { border: 1px solid rgba(23,23,23,.1); border-radius: 12px; padding: 8px 12px; display: flex; flex-direction: column; }
+.app-score small, .app-score span { font-size: 10px; color: #737373; } .app-score b { font-size: 28px; line-height: 32px; }
+.app-photo { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; flex: none; background: #000; }
+.app-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.app-photo i { position: absolute; border: 2px solid #c2680a; border-radius: 2px; } .app-photo i.b { border-color: #0a66d0; }
+.app-chips { display: flex; gap: 4px; } .app-chips span { height: 20px; padding: 0 8px; display: flex; align-items: center; border-radius: 6px; background: #f4f4f5; font-size: 9px; } .app-chips span.on { background: #171717; color: #fff; }
+
+/* 목록·가로 막대 */
+ul.pts { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+ul.pts li { position: relative; padding-left: 24px; font-size: 26px; line-height: 36px; color: var(--ink2); }
+ul.pts li::before { content: ""; position: absolute; left: 4px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.hfill { height: 100%; background: var(--accent); border-radius: 8px; transform-origin: left; }
+.slide.active .hfill { animation: growx 1s var(--ease) both; animation-delay: calc(var(--i, 0) * 120ms + .5s); }
+@keyframes growx { from { transform: scaleX(0); } }
+
+/* 병합 슬라이드 보조 */
+.vsrow { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-radius: 12px; font-size: 26px; line-height: 34px; }
+.vsrow .i { font-size: 28px; }
+.vsrow.old { background: var(--raised); color: var(--muted); } .vsrow.new { background: var(--accent-t); color: var(--accent-d); font-weight: 500; }
+ul.pts.light li { color: #fff; } ul.pts.light li::before { background: #fff; }
+
+/* 화려한 움직임: 방향별 등장, 글자 리빌, 커튼 전환, 틸트 */
+.slide.active [data-a="l"] { animation-name: fromL; } .slide.active [data-a="r"] { animation-name: fromR; } .slide.active [data-a="z"] { animation-name: zoomin; }
+@keyframes fromL { from { opacity: 0; transform: translateX(-64px); } } @keyframes fromR { from { opacity: 0; transform: translateX(64px); } }
+@keyframes zoomin { from { opacity: 0; transform: scale(.9); } }
+.slide.active [data-a] { animation-duration: .7s; }
+.w { display: inline-block; white-space: nowrap; }
+.ch { display: inline-block; }
+.slide.active .ch { animation: chrise .7s var(--ease) both; animation-delay: calc(var(--c) * 30ms + 150ms); }
+@keyframes chrise { from { opacity: 0; transform: translateY(.5em); } }
+#curtain { position: absolute; inset: 0; background: var(--accent); z-index: 30; transform: translateX(-101%); pointer-events: none; }
+#curtain.go { animation: curtain .8s var(--ease) both; } #curtain.go.back { animation-name: curtainb; }
+@keyframes curtain { 0% { transform: translateX(-101%); } 45%, 55% { transform: translateX(0); } 100% { transform: translateX(101%); } }
+@keyframes curtainb { 0% { transform: translateX(101%); } 45%, 55% { transform: translateX(0); } 100% { transform: translateX(-101%); } }
+.card, .phone, .photo { transition: transform .25s var(--ease), border-color .15s var(--ease), background-color .15s var(--ease); }
+.card:hover { transform: translateY(-4px); border-color: var(--accent); }
+.link { container-type: inline-size; }
+.link::after { content: ""; position: absolute; left: 0; top: -7px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); opacity: 0; }
+.slide.active .link::after { animation: pkt 2s var(--ease) infinite; }
+@keyframes pkt { 0% { transform: translateX(0); opacity: 0; } 15%, 85% { opacity: 1; } 100% { transform: translateX(calc(100cqw - 16px)); opacity: 0; } }
+.slide.active .ico.a { animation: icopop .6s var(--ease) both; animation-delay: .5s; }
+@keyframes icopop { 0% { transform: scale(.6) rotate(-8deg); } 70% { transform: scale(1.08) rotate(2deg); } 100% { transform: none; } }
+/* 비교 */
+.vs { display: grid; grid-template-columns: 1fr 96px 1.1fr; align-items: stretch; margin: 40px 0 72px; flex: 1; }
+.vs .col { border-radius: 20px; padding: 32px 40px; display: flex; flex-direction: column; }
+.vs .old { background: var(--raised); } .vs .new { background: var(--accent); color: #fff; }
+.vs .mid { display: grid; place-items: center; font-size: 36px; font-weight: 500; color: var(--muted); }
+.vs h3 { font-size: 32px; margin-bottom: 8px; } .vs .old h3 { color: var(--muted); }
+.vs .row { display: flex; align-items: center; gap: 16px; font-size: 30px; line-height: 40px; font-weight: 500; flex: 1; }
+.vs .old .row { color: var(--ink2); font-weight: 400; }
+.vs .row .m { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; flex: none; }
+.vs .old .m { background: #e4e4e7; color: var(--muted); } .vs .new .m { background: rgba(255,255,255,.2); color: #fff; }
+
+.sim { display: flex; flex-direction: column; gap: 16px; }
+.sim .it { display: flex; align-items: center; gap: 16px; padding: 20px 28px; border-radius: 16px; background: #fff; border: 1px solid var(--hair); font-size: 32px; line-height: 40px; font-weight: 500; }
+.sim .it .d { margin-left: auto; font-size: 36px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.d.hi { color: #c0262d; } .d.mid { color: var(--warn); } .d.lo { color: var(--muted); }
+
+/* 영상 */
+.vidslide { padding: 0; flex-direction: row !important; align-items: center; justify-content: center; gap: 120px; }
+.vidslide .vph { padding: 12px; border-radius: 76px; background: #2a2a2d; transform: translateZ(0); will-change: transform; }
+.vidslide video { display: block; height: 1000px; width: auto; border-radius: 64px; background: #000; cursor: pointer; }
+.vidslide .side { width: 520px; display: flex; flex-direction: column; gap: 32px; }
+.vidslide .side h2 { font-size: 112px; margin: 0; line-height: 1.1; }
+.lnk { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 26px; font-weight: 500; text-decoration: none; transition: background-color .15s var(--ease); }
+.lnk:hover { background: var(--accent-d); } .dark .lnk { color: #0b1626; } .dark .lnk:hover { background: #8fc3ff; }
+.vbtn { display: inline-flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; border-radius: 10px; background: #ededed; color: #141415; font-size: 24px; font-weight: 500; cursor: pointer; border: 0; font-family: inherit; align-self: flex-start; transition: background-color .15s var(--ease); }
+.vbtn:hover { background: #fff; }
+
+.agenda { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 48px 0 24px; flex: 1; }
+.agenda .card { display: flex; flex-direction: column; justify-content: space-between; padding: 40px; }
+.agenda .n { font-size: 24px; line-height: 32px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.agenda h3 { font-size: 44px; margin: 4px 0 8px; } .agenda .card p { font-size: 26px; }
+.agenda .acc .n { color: rgba(255,255,255,.7); }
+
+.cover { padding: 0; flex-direction: row !important; align-items: center; }
+.cover .l { padding-left: 128px; width: 1000px; }
+.cover h1 { margin: 24px 0 24px -8px; }
+.cover .photo { position: absolute !important; right: 120px; top: 144px; width: 760px; height: 792px; border-radius: 20px; }
+.cover .meta { font-size: 28px; line-height: 40px; color: var(--muted); margin-top: 48px; } .cover .meta b { color: var(--ink); }
+.typer { white-space: nowrap; font-size: 44px; line-height: 56px; font-weight: 500; color: var(--ink); }
+.slide.active .typer { animation: type 1.6s steps(18) .6s both; }
+@keyframes type { from { clip-path: inset(0 100% 0 0); } }
+
+#bar { position: fixed; left: 0; top: 0; height: 4px; background: #5aa5f5; width: 0; transition: width .4s var(--ease); z-index: 5; }
+#hud { position: fixed; right: 16px; bottom: 12px; z-index: 5; color: #fff; font: 500 14px/1 "SUIT", sans-serif; background: rgba(20,20,21,.8); padding: 8px 12px; border-radius: 8px; display: flex; gap: 12px; align-items: center; transition: opacity .3s; }
+#hud button { all: unset; cursor: pointer; padding: 2px 8px; border-radius: 4px; } #hud button:hover { background: rgba(255,255,255,.16); }
+body.idle #hud { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01s !important; animation-delay: 0s !important; } }
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body { overflow: visible; height: auto; background: #fff; }
+  #viewport { position: static; overflow: visible; } #stage { position: static; transform: none !important; width: 1920px; height: auto; }
+  .slide { display: flex !important; position: relative; height: 1080px; page-break-after: always; animation: none !important; }
+  [data-a], .box, .ch { opacity: 1 !important; animation: none !important; transform: none !important; } #curtain { display: none; } .vb .bar, .hfill { animation: none !important; transform: none; } .ring .fg { animation: none !important; stroke-dashoffset: calc(1131 * (1 - var(--p))); }
+  .typer { clip-path: none; animation: none !important; } .scan { display: none; } #bar, #hud { display: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-only { display: block !important; } video, #vfs, .screen-only { display: none !important; }
+  .slide::before { display: none; } .link::after { display: none; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/></symbol>
+  <symbol id="video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="3"/><path d="m22 8-6 4 6 4z"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+  <symbol id="phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></symbol>
+  <symbol id="cloud" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 9.5 4.5 4.5 0 0 1 17.5 18z"/></symbol>
+  <symbol id="qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v1M17 20h4M20 18v3"/></symbol>
+  <symbol id="brain" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V4a3 3 0 0 0-3 0zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></symbol>
+  <symbol id="rule" viewBox="0 0 24 24"><path d="M4 6h10M4 12h16M4 18h8"/><circle cx="18" cy="6" r="2"/><circle cx="16" cy="18" r="2"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10"/></symbol>
+  <symbol id="bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
+</defs></svg>
+<div id="bar"></div>
+<div id="viewport"><div id="stage">
+
+<!-- 1. 표지 -->
+<section class="slide dark cover" data-title="표지">
+  <div class="l">
+    <div class="tag" data-a style="--i:0"><svg class="i"><use href="#scan"/></svg>AI 기반 생활안전 앱</div>
+    <h1 data-a style="--i:1">앗차차</h1>
+    <div class="typer">집 안 구석구석, 하루하루 안심하게</div>
+    <p data-a style="--i:12;margin-top:32px">사진으로 위험 후보를 찾고,<br>남는 휴대폰을 홈캠으로 씁니다</p>
+    <div class="meta" data-a style="--i:14"><b>발표자 길재현</b> · Android · On-device AI</div>
+  </div>
+  <div class="photo" data-a style="--i:2">
+    <img src="assets/room.jpg" alt="실내 사진 위에 탐지 박스가 표시되는 예시">
+    <div class="scan"></div>
+    <div class="box" style="--d:1.2;left:31%;top:58%;width:42%;height:38%"><b>소파 모서리 확인</b></div>
+    <div class="box w" style="--d:1.6;left:24%;top:68%;width:17%;height:31%"><b>의자</b></div>
+    <div class="box" style="--d:2;left:0;top:34%;width:19%;height:22%"><b>TV</b></div>
+    <div class="corners"><i></i><i></i><i></i><i></i></div>
+  </div>
+</section>
+
+<!-- 2. 목차 -->
+<section class="slide" data-title="목차">
+  <div class="tag" data-a>목차</div>
+  <h2 data-a style="--i:1">오늘의 <em>여섯 장면</em></h2>
+  <div class="agenda">
+    <div class="card" data-a style="--i:2"><div class="ico a"><svg class="i"><use href="#home"/></svg></div><div><div class="n">01</div><h3>개요</h3><p>왜 만들었나</p></div></div>
+    <div class="card" data-a style="--i:3"><div class="ico a"><svg class="i"><use href="#star"/></svg></div><div><div class="n">02</div><h3>기존 기술과 차별성</h3><p>무엇이 다른가</p></div></div>
+    <div class="card" data-a style="--i:4"><div class="ico a"><svg class="i"><use href="#chip"/></svg></div><div><div class="n">03</div><h3>시스템 설계</h3><p>어떻게 동작하나</p></div></div>
+    <div class="card" data-a style="--i:5"><div class="ico a"><svg class="i"><use href="#scan"/></svg></div><div><div class="n">04</div><h3>정량 / 정성 결과</h3><p>얼마나 잘 되나</p></div></div>
+    <div class="card" data-a style="--i:6"><div class="ico a"><svg class="i"><use href="#brain"/></svg></div><div><div class="n">05</div><h3>AI 활용 경험</h3><p>무엇을 배웠나</p></div></div>
+    <div class="card acc" data-a style="--i:7"><div class="ico"><svg class="i"><use href="#video"/></svg></div><div><div class="n">06</div><h3>시연 영상</h3><p>직접 보여드립니다</p></div></div>
+  </div>
+</section>
+
+<!-- 3. 문제 -->
+<section class="slide" data-title="개요 · 문제 배경">
+  <div class="tag" data-a><b>01</b>개요</div>
+  <h2 data-a style="--i:1">가장 <em>익숙한 곳</em>에서<br>가장 많이 다칩니다</h2>
+  <div style="display:flex;gap:32px;margin:32px 0 64px;flex:1;align-items:center">
+    <div class="card" data-a style="--i:2;flex:1;display:flex;align-items:center;gap:40px;padding:40px">
+      <div class="ring" style="--p:.678"><svg viewBox="0 0 400 400"><circle class="bg" cx="200" cy="200" r="180"/><circle class="fg" cx="200" cy="200" r="180"/></svg>
+        <div class="c"><div class="num accent" style="font-size:80px"><span class="cnt" data-to="67.8" data-dec="1">67.8</span><small>%</small></div></div></div>
+      <div><h3>어린이 사고</h3><p style="margin-top:8px">가정 안에서 발생</p>
+        <p style="margin-top:24px;font-size:24px;line-height:36px">침대·가구 추락 최대 48.8%<br>가구·문 부딪힘 최대 25%</p></div>
+    </div>
+    <div class="card" data-a style="--i:3;flex:1;display:flex;align-items:center;gap:40px;padding:40px">
+      <div class="ring" style="--p:.69"><svg viewBox="0 0 400 400"><circle class="bg" cx="200" cy="200" r="180"/><circle class="fg" cx="200" cy="200" r="180"/></svg>
+        <div class="c"><div class="num accent" style="font-size:88px"><span class="cnt" data-to="69">69</span><small>%</small></div></div></div>
+      <div><h3>65세 이상 낙상</h3><p style="margin-top:8px">안전사고 중 미끄러짐·넘어짐</p>
+        <p style="margin-top:24px;font-size:24px;line-height:36px">거실 25.1% · 욕실 23.5%<br>침실 22.6% · 계단 15.3%</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>수치는 기존 발표자료의 통계를 그대로 옮겼습니다 (낙상 비율 62.7~69.0% 중 최댓값)</span><span>앗차차 · 01 개요</span></div>
+</section>
+
+<!-- 4. 서비스 소개 -->
+<section class="slide" data-title="개요 · 서비스 소개">
+  <div class="tag" data-a><b>01</b>개요</div>
+  <h2 data-a style="--i:1">앗차차는 <em>두 가지</em>를 합니다</h2>
+  <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:80px;margin:-8px 0 40px">
+    <div class="phone" data-a style="--i:2;width:344px;height:704px"><div class="screen"><div class="app">
+      <div class="app-title">앗차차</div><div class="app-sub">집을 더 안전하게. 기능을 선택하세요.</div>
+      <div class="app-card"><b>홈캠</b><p>실시간 영상으로 집을 지켜보세요.</p><div class="app-btn">홈캠 시작하기</div></div>
+      <div class="app-card"><b>사진 안전점검</b><p>사진을 찍으면 가구·전기 위험 요소를 알려줍니다.</p><div class="app-btn">사진 점검 시작하기</div></div>
+      <div class="app-foot">사진 점검은 모델 설치 후 오프라인으로 사용할 수 있어요.</div></div></div></div>
+    <div style="display:flex;flex-direction:column;gap:24px;width:560px">
+      <div class="card" data-a style="--i:3;display:flex;gap:24px;align-items:center"><div class="ico a"><svg class="i"><use href="#scan"/></svg></div><div><h3>사진 안전점검</h3><p style="font-size:26px">사진 한 장으로 위험 후보 박스와 권고</p></div></div>
+      <div class="card" data-a style="--i:4;display:flex;gap:24px;align-items:center"><div class="ico a"><svg class="i"><use href="#video"/></svg></div><div><h3>공기계 홈캠</h3><p style="font-size:26px">안 쓰는 폰과 QR 한 번으로 실시간 영상</p></div></div>
+      <div data-a style="--i:5;display:flex;flex-wrap:wrap;gap:12px"><span class="lb a"><svg class="i"><use href="#lock"/></svg>분석은 내 휴대폰 안에서</span><a class="lb a" href="https://zlkdjkdj.github.io/26-2-AI-Project-/" target="_blank" rel="noopener" style="text-decoration:none"><svg class="i"><use href="#arrow"/></svg>웹 체험판에서 먼저 써 보기</a></div>
+    </div>
+    <div class="phone" data-a style="--i:3;width:344px;height:704px"><div class="screen"><div class="app">
+      <div class="app-eyebrow">사진 안전점검</div><div class="app-h">이곳부터 살펴보세요</div>
+      <div class="app-score"><small>참고 안전점수</small><b>54점</b><span>탐지된 물건 6개 · 확인 항목 5개</span></div>
+      <div class="app-photo"><img src="assets/room.jpg" alt=""><i style="left:30%;top:56%;width:44%;height:40%"></i><i style="left:22%;top:66%;width:18%;height:32%"></i><i class="b" style="left:0;top:34%;width:19%;height:22%"></i></div>
+      <div class="app-chips"><span class="on">전체 박스</span><span>1. 소파 · 중위험</span></div>
+      <div class="app-card"><b>소파 모서리 확인</b><p>단단한 모서리가 사람이 부딪힐 위치인지 확인하세요.</p></div></div></div></div>
+  </div>
+  <div class="foot"><span>이 장의 앱 화면은 웹 데모 구성 재현본입니다. 실제 캡처는 04 결과에 있습니다.</span><span>앗차차 · 01 개요</span></div>
+</section>
+
+<!-- 5. 차별성 (비교 + 핵심 병합) -->
+<section class="slide" data-title="기존 기술과 차별성">
+  <div class="tag" data-a><b>02</b>기존 기술과 차별성</div>
+  <h2 data-a style="--i:1">기존 방식과 다른 <em>세 가지</em></h2>
+  <div style="display:flex;gap:24px;flex:1;margin:40px 0 64px">
+    <div class="card tilt" data-a style="--i:2;flex:1;display:flex;flex-direction:column;padding:40px;gap:16px">
+      <div class="ico a"><svg class="i"><use href="#phone"/></svg></div>
+      <div class="num accent" style="font-size:176px;margin-top:8px"><span class="cnt" data-to="0">0</span><small>대</small></div>
+      <h3>추가 장비 구매</h3>
+      <div class="vsrow old"><svg class="i"><use href="#x"/></svg>전용 카메라를 새로 구매</div>
+      <div class="vsrow new"><svg class="i"><use href="#check"/></svg>안 쓰는 공기계 두 대로 연결</div></div>
+    <div class="card tilt" data-a style="--i:3;flex:1;display:flex;flex-direction:column;padding:40px;gap:16px">
+      <div class="ico a"><svg class="i"><use href="#shield"/></svg></div>
+      <div class="num accent" style="font-size:176px;margin-top:8px"><span class="cnt" data-to="0">0</span><small>건</small></div>
+      <h3>외부 서버 사진 전송</h3>
+      <div class="vsrow old"><svg class="i"><use href="#x"/></svg>업체 서버·클라우드를 거쳐 분석</div>
+      <div class="vsrow new"><svg class="i"><use href="#check"/></svg>기기 안 분석, 기기 간 직접 연결</div></div>
+    <div class="card tilt" data-a style="--i:4;flex:1;display:flex;flex-direction:column;padding:40px;gap:16px">
+      <div class="ico a"><svg class="i"><use href="#brain"/></svg></div>
+      <div class="num accent" style="font-size:176px;margin-top:8px"><span class="cnt" data-to="2">2</span><small>개 모델</small></div>
+      <h3>교차 확인과 규칙 기반 권고</h3>
+      <div class="vsrow old"><svg class="i"><use href="#x"/></svg>객체 이름만 나열, 직접 둘러보는 점검</div>
+      <div class="vsrow new"><svg class="i"><use href="#check"/></svg>확인 항목, 권고, 참고 점수까지</div></div>
+  </div>
+  <div class="foot"><span>'기존 방식'은 일반적인 경향을 정리한 것이며 특정 제품을 지칭하지 않습니다.</span><span>앗차차 · 02 차별성</span></div>
+</section>
+
+<!-- 7. 시스템 A -->
+<section class="slide" data-title="시스템 설계 · 사진 점검">
+  <div class="tag" data-a><b>03</b>시스템 설계</div>
+  <h2 data-a style="--i:1">사진 안전점검 <em>5단계</em></h2>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;margin-bottom:48px">
+    <div class="pipe">
+      <div class="link" style="left:11%;width:14%"></div><div class="link" style="left:31%;width:14%"></div><div class="link" style="left:51%;width:14%"></div><div class="link" style="left:71%;width:14%"></div>
+      <div class="node" data-a style="--i:2"><div class="ico a"><svg class="i"><use href="#phone"/></svg></div><h3>촬영·선택</h3><p>사진 입력</p></div>
+      <div class="node" data-a style="--i:3"><div class="ico a"><svg class="i"><use href="#chip"/></svg></div><h3>객체 탐지</h3><p>YOLOv8s<br>Grounding DINO</p></div>
+      <div class="node" data-a style="--i:4"><div class="ico a"><svg class="i"><use href="#scan"/></svg></div><h3>교차 확인</h3><p>중복 정리<br>충돌은 확인 필요</p></div>
+      <div class="node" data-a style="--i:5"><div class="ico a"><svg class="i"><use href="#rule"/></svg></div><h3>규칙 적용</h3><p>종류와 위치로<br>권고 생성</p></div>
+      <div class="node" data-a style="--i:6"><div class="ico a"><svg class="i"><use href="#star"/></svg></div><h3>결과 화면</h3><p>박스 · 점수<br>피드백</p></div>
+    </div>
+    <div data-a style="--i:8;display:flex;gap:16px;margin-top:72px;justify-content:center">
+      <span class="lb"><svg class="i"><use href="#lock"/></svg>모델 설치 후 오프라인</span><span class="lb"><svg class="i"><use href="#shield"/></svg>SHA-256 무결성 검증</span><span class="lb"><svg class="i"><use href="#bolt"/></svg>기본 결과 먼저, 추가 결과로 갱신</span>
+    </div>
+  </div>
+  <div class="foot"><span>위험 등급과 권고는 생성형 AI가 아닌 사전 정의 규칙으로 만듭니다.</span><span>앗차차 · 03 시스템 설계</span></div>
+</section>
+
+<!-- 8. 시스템 B -->
+<section class="slide dark" data-title="시스템 설계 · 홈캠">
+  <div class="tag" data-a><b>03</b>시스템 설계</div>
+  <h2 data-a style="--i:1">공기계 홈캠은 <em>직접 연결</em></h2>
+  <div style="flex:1;display:flex;align-items:center;justify-content:space-between;padding:0 32px">
+    <div data-a style="--i:2;text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px">
+      <div class="ico" style="width:200px;height:200px;font-size:96px;border-radius:40px"><svg class="i"><use href="#phone"/></svg></div><h3>촬영용 공기계</h3><p style="font-size:24px">QR 생성 · 카메라 송출</p></div>
+    <div style="flex:1;position:relative;height:300px;margin:0 32px">
+      <div class="link" style="left:0;right:0;top:136px"></div><div class="link" style="left:0;right:0;top:184px"></div>
+      <div style="position:absolute;left:50%;top:-8px;transform:translateX(-50%);text-align:center" data-a style="--i:3"><div class="ico a" style="width:112px;height:112px;font-size:56px;margin:0 auto"><svg class="i"><use href="#cloud"/></svg></div>
+        <div class="lb" style="margin-top:12px">Tailscale 사설망</div></div>
+      <div style="position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);white-space:nowrap" data-a style="--i:5"><span class="lb"><svg class="i"><use href="#lock"/></svg>WebRTC 암호화 영상 · 중계 서버 없음</span></div>
+    </div>
+    <div data-a style="--i:2;text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px">
+      <div class="ico a" style="width:200px;height:200px;font-size:96px;border-radius:40px"><svg class="i"><use href="#video"/></svg></div><h3>모니터링 휴대폰</h3><p style="font-size:24px">QR 스캔 · 영상 시청</p></div>
+  </div>
+  <div style="display:flex;gap:24px;margin-bottom:64px">
+    <div class="card" data-a style="--i:6;flex:1;display:flex;gap:20px;align-items:center;padding:24px 32px"><svg class="i accent" style="font-size:48px"><use href="#qr"/></svg><h3 style="font-size:30px">1회용 QR 등록</h3></div>
+    <div class="card" data-a style="--i:7;flex:1;display:flex;gap:20px;align-items:center;padding:24px 32px"><svg class="i accent" style="font-size:48px"><use href="#user"/></svg><h3 style="font-size:30px">ML Kit 사람 위치 표시</h3></div>
+    <div class="card" data-a style="--i:8;flex:1;display:flex;gap:20px;align-items:center;padding:24px 32px"><svg class="i accent" style="font-size:48px"><use href="#video"/></svg><h3 style="font-size:30px">수동 녹화 · 낙상 의심(실험)</h3></div>
+  </div>
+  <div class="foot"><span>촬영 기기는 충전하며 앱과 화면을 켜 둡니다. 두 기기 모두 인터넷과 같은 Tailnet이 필요합니다.</span><span>앗차차 · 03 시스템 설계</span></div>
+</section>
+
+<!-- 9. 기술 스택 -->
+<section class="slide" data-title="시스템 설계 · 기술 스택">
+  <div class="tag" data-a><b>03</b>시스템 설계</div>
+  <h2 data-a style="--i:1">기술 스택</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:40px;flex:1;align-content:start">
+    <div class="card fill" data-a style="--i:2"><div class="lb a" style="margin-bottom:24px"><svg class="i"><use href="#code"/></svg>앱 · 언어</div>
+      <div class="chips"><span class="chip"><i></i>React Native 0.88</span><span class="chip"><i></i>Expo SDK 58</span><span class="chip"><i></i>Expo Router</span><span class="chip n"><i></i>JavaScript</span><span class="chip n"><i></i>Kotlin</span><span class="chip n"><i></i>Java</span></div></div>
+    <div class="card fill" data-a style="--i:3"><div class="lb a" style="margin-bottom:24px"><svg class="i"><use href="#brain"/></svg>AI</div>
+      <div class="chips"><span class="chip"><i></i>ONNX Runtime</span><span class="chip"><i></i>YOLOv8s</span><span class="chip"><i></i>Grounding DINO Tiny</span><span class="chip"><i></i>Google ML Kit</span></div></div>
+    <div class="card fill" data-a style="--i:4"><div class="lb a" style="margin-bottom:24px"><svg class="i"><use href="#video"/></svg>영상 · 연결</div>
+      <div class="chips"><span class="chip"><i></i>WebRTC</span><span class="chip"><i></i>Tailscale</span><span class="chip n"><i></i>Expo Camera</span><span class="chip n"><i></i>SecureStore</span></div></div>
+    <div class="card fill" data-a style="--i:5"><div class="lb a" style="margin-bottom:24px"><svg class="i"><use href="#bolt"/></svg>빌드 · 관리</div>
+      <div class="chips"><span class="chip n"><i></i>Node.js · npm</span><span class="chip n"><i></i>Android SDK · Gradle</span><span class="chip n"><i></i>Git · GitHub</span><span class="chip"><i></i>Android APK</span></div></div>
+  </div>
+  <div class="foot"><span>사진 분석 경로에 Gemini API와 PC 서버는 사용하지 않습니다.</span><span>앗차차 · 03 시스템 설계</span></div>
+</section>
+
+<!-- 10. 실제 화면 -->
+<section class="slide dark" data-title="결과 · 실제 앱 화면">
+  <div class="tag" data-a><b>04</b>정량 / 정성 결과</div>
+  <h2 data-a style="--i:1">실제 앱 화면 <em>그대로</em></h2>
+  <div style="flex:1;display:flex;align-items:center;gap:56px;margin:8px 0 32px">
+    <div class="phone" data-a style="--i:2;height:740px;aspect-ratio:1080/2192;margin-left:48px"><div class="screen"><img src="assets/shot-result.jpg" alt="참고 점수 80점 결과 화면"></div></div>
+    <div class="phone" data-a style="--i:3;height:740px;aspect-ratio:1080/2192"><div class="screen"><img src="assets/shot-boxes.jpg" alt="번호 박스와 위험 항목 목록"></div></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px;margin-left:48px">
+      <div class="card" data-a style="--i:4;display:flex;gap:20px;align-items:center;padding:24px 28px"><div class="ico a" style="width:64px;height:64px;font-size:32px"><svg class="i"><use href="#star"/></svg></div><div><h3 style="font-size:30px">참고 점수 80점</h3><p style="font-size:24px">탐지 7개 · 확인 항목 4개</p></div></div>
+      <div class="card" data-a style="--i:5;display:flex;gap:20px;align-items:center;padding:24px 28px"><div class="ico a" style="width:64px;height:64px;font-size:32px"><svg class="i"><use href="#scan"/></svg></div><div><h3 style="font-size:30px">번호 붙은 위험 후보 박스</h3><p style="font-size:24px">종류 · 위치 · 위험 등급</p></div></div>
+      <div class="card" data-a style="--i:6;display:flex;gap:20px;align-items:center;padding:24px 28px"><div class="ico a" style="width:64px;height:64px;font-size:32px"><svg class="i"><use href="#rule"/></svg></div><div><h3 style="font-size:30px">'의자·책상 모서리 확인'</h3><p style="font-size:24px">현장에서 볼 대상을 안내</p></div></div>
+      <div class="card" data-a style="--i:7;display:flex;gap:20px;align-items:center;padding:24px 28px"><div class="ico a" style="width:64px;height:64px;font-size:32px"><svg class="i"><use href="#expand"/></svg></div><div><h3 style="font-size:30px">확대 · 항목별 박스 보기</h3><p style="font-size:24px">사진 위에서 하나씩 확인</p></div></div>
+    </div>
+  </div>
+  <div class="foot"><span>강의실을 실제 촬영해 분석한 앱 캡처 (스크롤한 화면)</span><span>앗차차 · 04 결과</span></div>
+</section>
+
+<!-- 11. 정량 1 -->
+<section class="slide" data-title="결과 · 정량 성능">
+  <div class="tag" data-a><b>04</b>정량 / 정성 결과</div>
+  <h2 data-a style="--i:1">탐지 시간 <em>최대 40% 단축</em></h2>
+  <div style="display:flex;gap:64px;flex:1;margin:32px 0 72px;align-items:center">
+    <div style="flex:1.25" data-a style="--i:2">
+      <div class="vchart">
+        <div class="vb"><span class="v">33.7초</span><div class="bar" style="--h:66%;--i:0"></div></div>
+        <div class="vb"><span class="v accent">23.8초</span><div class="bar a" style="--h:47%;--i:1"></div></div>
+        <div style="width:48px"></div>
+        <div class="vb"><span class="v">42.5초</span><div class="bar" style="--h:83%;--i:2"></div></div>
+        <div class="vb"><span class="v accent">25.7초</span><div class="bar a" style="--h:50%;--i:3"></div></div>
+      </div>
+      <div class="vlab"><span>최적화 전</span><span>최적화 후</span><span style="flex:none;width:48px"></span><span>최적화 전</span><span>최적화 후</span></div>
+      <div class="vlab" style="padding-top:4px"><span style="flex:2;color:var(--muted)">콘센트·멀티탭 사진</span><span style="flex:none;width:48px"></span><span style="flex:2;color:var(--muted)">실내 전경 사진</span></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+      <div class="card" data-a style="--i:3;display:flex;align-items:center;gap:32px"><div class="num accent" style="font-size:120px"><span class="cnt" data-to="29">29</span><small>%</small></div><div><h3>단축</h3><p style="font-size:24px">콘센트·멀티탭 사진</p></div></div>
+      <div class="card" data-a style="--i:4;display:flex;align-items:center;gap:32px"><div class="num accent" style="font-size:120px"><span class="cnt" data-to="40">40</span><small>%</small></div><div><h3>단축</h3><p style="font-size:24px">실내 전경 사진</p></div></div>
+      <div class="card acc" data-a style="--i:5"><p style="font-size:24px;color:#d6e8ff">같은 사진 재분석 (결과 캐시)</p><div class="num" style="font-size:64px;margin-top:12px;display:flex;align-items:center;gap:20px">18.6초 <svg class="i" style="font-size:48px"><use href="#arrow"/></svg> 0.004초</div></div>
+    </div>
+  </div>
+  <div class="foot"><span>PC CPU 환경, 전체 모델 측정값이며 출력 결과는 전후 동일합니다. 휴대폰(S25) 실측은 아직 진행 전입니다.</span><span>앗차차 · 04 결과</span></div>
+</section>
+
+<!-- 12. 점수 -->
+<section class="slide" data-title="결과 · 점수 규칙">
+  <div class="tag" data-a><b>04</b>정량 / 정성 결과</div>
+  <h2 data-a style="--i:1">위험 판정과 <em>점수 기준</em></h2>
+  <div style="display:flex;gap:96px;flex:1;align-items:center;margin:8px 0 96px">
+    <div class="sim" style="flex:1">
+      <div class="it" data-a style="--i:2"><span class="lb">시작</span>기본 점수<span class="d">100</span></div>
+      <div class="it" data-a style="--i:3"><span class="lb w">고위험</span>항목당<span class="d hi">−25</span></div>
+      <div class="it" data-a style="--i:4"><span class="lb w">중위험</span>항목당<span class="d mid">−12</span></div>
+      <div class="it" data-a style="--i:5"><span class="lb">저위험</span>항목당<span class="d lo">−5</span></div>
+      <div class="it" data-a style="--i:6;background:var(--raised);border-color:transparent"><svg class="i" style="font-size:32px;color:var(--accent)"><use href="#shield"/></svg>상한 적용<span class="d" style="font-size:26px;font-weight:500;color:var(--ink2)">고위험 0개 80 · 1개 60 · 2개 이상 40</span></div>
+    </div>
+    <div style="flex:none;text-align:center" data-a style="--i:3">
+      <div class="ring" style="--p:.6;width:440px;height:440px"><svg viewBox="0 0 400 400"><circle class="bg" cx="200" cy="200" r="180"/><circle class="fg" cx="200" cy="200" r="180"/></svg>
+        <div class="c"><div><div class="num accent" style="font-size:160px"><span class="cnt" data-to="60" data-dur="1800" data-delay="1200">60</span></div><p style="font-size:24px;line-height:32px;margin-top:8px">고위험 1 + 중위험 1<br>100−25−12 = 63, 상한 60 적용</p></div></div></div>
+      <div class="lb" style="margin-top:24px">'종류 확인 필요'만 있으면 점수 산정 보류</div>
+    </div>
+  </div>
+  <div class="chips" data-a style="--i:8;margin:-24px 0 56px"><span class="chip"><i></i>위험 규칙: 물건 종류와 사진 속 위치로 등급과 권고 결정</span><span class="chip"><i></i>두 모델 판정이 엇갈리면 '확인 필요'로 표시하고 점수에서 제외</span><span class="chip"><i></i>기준은 AI와 함께 수립</span></div>
+  <div class="foot"><span>안전 인증이 아닌 확인 항목 한정 참고값 · 신뢰도 문턱값은 YOLO 0.24~0.35, DINO 0.35~0.50 (정답 확률 아님)</span><span>앗차차 · 04 결과</span></div>
+</section>
+
+<!-- 13. 정성 -->
+<section class="slide" data-title="결과 · 정성 평가와 검증">
+  <div class="tag" data-a><b>04</b>정량 / 정성 결과</div>
+  <h2 data-a style="--i:1">잘 되는 점과 <em>한계</em></h2>
+  <div style="display:flex;gap:32px;flex:1;margin:24px 0 48px;min-height:0">
+    <div class="photo" data-a style="--i:2;width:480px;flex:none"><img src="assets/shot-boxes.jpg" alt="번호 박스가 많은 결과 화면" style="object-position:50% 8%"><div class="scan"></div></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:16px">
+      <div class="card" data-a style="--i:3;flex:1"><div class="lb p"><svg class="i"><use href="#check"/></svg>잘 되는 점</div>
+        <div class="chips" style="margin-top:20px"><span class="chip p"><i></i>TV·의자·책상·전선 후보를 위치와 함께</span><span class="chip p"><i></i>번호 박스와 목록 연동</span><span class="chip p"><i></i>모델이 어긋나면 '확인 필요'</span><span class="chip p"><i></i>오프라인 분석</span></div></div>
+      <div class="card warn" data-a style="--i:4;flex:1"><div class="lb w"><svg class="i"><use href="#x"/></svg>관찰된 한계</div>
+        <div class="chips" style="margin-top:20px"><span class="chip w"><i></i>모니터가 'TV'로 분류됨</span><span class="chip w"><i></i>박스와 라벨이 겹쳐 읽기 어려움</span><span class="chip w"><i></i>가는 전선은 놓칠 수 있음</span><span class="chip w"><i></i>모서리 날카로움·전기 손상은 판단 불가</span></div></div>
+      <div class="card fill" data-a style="--i:5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:24px 32px"><b style="font-size:26px;margin-right:8px">검증 현황</b><span class="lb p">완료 · 단위 테스트, 사례, PC 속도</span><span class="lb w">진행 · 홈캠 기기별 검수</span><span class="lb">미측정 · 정확도, 발열</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 13. AI 활용: 목적과 성과 1 (병합) -->
+<section class="slide" data-title="AI 활용 · 목적과 성과 ①">
+  <div class="tag" data-a><b>05</b>AI 활용 경험</div>
+  <h2 data-a style="--i:1">AI 활용 <em>목적</em>과 성과 ①</h2>
+  <div style="display:flex;gap:24px;margin:32px 0 24px">
+    <div class="card fill tilt" data-a style="--i:2;flex:1;padding:32px;display:flex;flex-direction:column;gap:12px"><div class="lb a" style="align-self:flex-start"><svg class="i"><use href="#rule"/></svg>기획</div>
+      <h3 style="font-size:32px">범위를 안전관리로 좁힘</h3>
+      <p style="font-size:24px;line-height:34px">영유아·노약자 플랫폼, 인테리어 추천까지 구상했다가 교수님 조언과 AI 검토로 정리</p></div>
+    <div class="card fill tilt" data-a style="--i:3;flex:1;padding:32px;display:flex;flex-direction:column;gap:12px"><div class="lb a" style="align-self:flex-start"><svg class="i"><use href="#code"/></svg>개발</div>
+      <h3 style="font-size:32px">Claude · Codex로 앱 빌드</h3>
+      <p style="font-size:24px;line-height:34px">React Native·Expo APK, 폰 안 YOLOv8s · Grounding DINO(ONNX)로 위험 탐지 기준 수립</p></div>
+    <div class="card fill tilt" data-a style="--i:4;flex:1;padding:32px;display:flex;flex-direction:column;gap:12px"><div class="lb a" style="align-self:flex-start"><svg class="i"><use href="#cloud"/></svg>구조</div>
+      <h3 style="font-size:32px">노 서버(No Server) 홈캠</h3>
+      <p style="font-size:24px;line-height:34px">서버 없이 동작하는 환경을 계획하고 사용할 수 있는 플랫폼을 AI로 비교·정리</p></div>
+  </div>
+  <div class="lb" data-a style="--i:5;align-self:flex-start;margin-bottom:16px">성과 ① 방향 정리와 구조 전환</div>
+  <div style="display:flex;align-items:stretch;gap:20px;flex:1;margin-bottom:64px">
+    <div class="card" data-a style="--i:6;flex:1;padding:32px"><div class="lb">처음</div>
+      <ul class="pts"><li>웹 기반, PC 서버 필요</li><li>집 사진 분석에 인테리어·가구 배치 추천까지</li></ul></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:56px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card acc" data-a style="--i:7;flex:1;padding:32px"><div class="lb" style="background:rgba(255,255,255,.16);color:#fff">지금</div>
+      <ul class="pts light"><li>폰 안 온디바이스 분석</li><li>PC 없이 폰 두 대로 쓰는 독립 홈캠</li><li>안전관리 중심: 항목별 경고, 안전 점수</li></ul></div>
+    <div style="flex:.9;display:flex;flex-direction:column;gap:12px">
+      <div class="card" data-a style="--i:8;flex:1;display:flex;gap:16px;align-items:center;padding:16px 28px"><svg class="i accent" style="font-size:36px"><use href="#shield"/></svg><h3 style="font-size:26px">서버 미구축으로 보안 강화</h3></div>
+      <div class="card" data-a style="--i:9;flex:1;display:flex;gap:16px;align-items:center;padding:16px 28px"><svg class="i accent" style="font-size:36px"><use href="#bolt"/></svg><h3 style="font-size:26px">초기 구성 비용 절감</h3></div>
+      <div class="card" data-a style="--i:10;flex:1;display:flex;gap:16px;align-items:center;padding:16px 28px"><svg class="i accent" style="font-size:36px"><use href="#lock"/></svg><h3 style="font-size:26px">외부 정보 유출 방지</h3></div>
+    </div>
+  </div>
+</section>
+
+<!-- 16. 성과 2: 1차 2차 탐지 -->
+<section class="slide" data-title="AI 활용 · 1차 2차 탐지 시스템">
+  <div class="tag" data-a><b>05</b>AI 활용 경험</div>
+  <h2 data-a style="--i:1">성과 ② <em>1차·2차 탐지</em> 시스템</h2>
+  <p data-a style="--i:2;margin-top:12px">모델 두 개를 한꺼번에 돌리면 폰에 과부하가 걸리고 대기 시간이 길어져 단계를 나눴습니다</p>
+  <div style="display:flex;align-items:stretch;gap:12px;margin:32px 0 24px">
+    <div class="card fill" data-a style="--i:3;flex:1;padding:28px 28px"><div class="lb a">입력</div><h3 style="margin-top:16px;font-size:32px">사진 촬영·선택</h3><p style="font-size:24px">크기 조정 후 기기 안에서 처리</p></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:40px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card" data-a style="--i:4;flex:1.3;padding:28px;border-color:var(--accent)"><div class="lb a">1차 탐지 · 약 2초</div><h3 style="margin-top:16px;font-size:32px">YOLOv8s</h3><p style="font-size:24px">가구 등 일반 물체를 빠르게 찾아 <b>먼저 화면에 표시</b></p></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:40px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card" data-a style="--i:5;flex:1.5;padding:28px;border-color:var(--accent)"><div class="lb a">2차 탐지 · 최종 약 40초</div><h3 style="margin-top:16px;font-size:32px">Grounding DINO</h3><p style="font-size:24px">전선·멀티탭·플러그·바닥과 일부 가구를 글로 질의해 <b>추가 확인</b></p></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:40px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card acc" data-a style="--i:6;flex:1;padding:28px"><div class="lb" style="background:rgba(255,255,255,.16);color:#fff">결과</div><h3 style="margin-top:16px;font-size:32px">교차 확인 후 갱신</h3><p style="font-size:24px">박스·점수가 최종값으로 바뀜</p></div>
+  </div>
+  <div style="display:flex;gap:24px;flex:1;margin-bottom:56px">
+    <div class="card fill" data-a style="--i:7;flex:1.1"><div class="lb">소요 시간 (개발 중 측정 평균)</div>
+      <div style="margin-top:28px;display:flex;flex-direction:column;gap:20px">
+        <div style="display:flex;align-items:center;gap:20px"><span style="width:140px;font-size:26px;font-weight:500">1차 YOLO</span><div style="flex:1;height:36px;background:#e4e4e7;border-radius:8px;overflow:hidden"><div class="hfill" style="width:5%;--i:0"></div></div><b class="num" style="font-size:36px;width:96px">2초</b></div>
+        <div style="display:flex;align-items:center;gap:20px"><span style="width:140px;font-size:26px;font-weight:500">2차 최종</span><div style="flex:1;height:36px;background:#e4e4e7;border-radius:8px;overflow:hidden"><div class="hfill" style="width:100%;--i:2"></div></div><b class="num accent" style="font-size:36px;width:96px">40초</b></div></div></div>
+    <div class="card fill" data-a style="--i:8;flex:1"><div class="lb">왜 이렇게 나눴나</div>
+      <ul class="pts"><li>사용자는 <b>2초 만에 1차 결과</b>를 보며 기다릴 수 있음</li><li>폰 메모리·CPU가 충분할 때만 병렬 실행, 부족하면 순차 실행</li><li>추가 모델이 실패해도 1차 결과는 유지</li></ul></div>
+  </div>
+  <div class="foot" style="bottom:20px"><span>시간은 기기·사진에 따라 달라집니다. 2차 모델은 RAM 약 5GiB 미만 기기에서 제한됩니다.</span><span>앗차차 · 05 AI 활용</span></div>
+</section>
+
+<!-- 18. 성과 4: 배포 한계 -->
+<section class="slide" data-title="AI 활용 · 배포 한계 해결">
+  <div class="tag" data-a><b>05</b>AI 활용 경험</div>
+  <h2 data-a style="--i:1">성과 ④ APK 배포의 한계, <em>웹으로 해결</em></h2>
+  <div style="display:flex;align-items:stretch;gap:16px;flex:1;margin:48px 0 72px">
+    <div class="card fill" data-a style="--i:2;flex:1;padding:36px"><div class="lb w">문제</div><h3 style="margin-top:20px;font-size:40px">외부 테스터에게 APK 제공이 어려움</h3><p style="font-size:30px;margin-top:8px">결과물은 나왔지만 평가받을 방법이 막혀 있었습니다</p></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:48px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card" data-a style="--i:3;flex:1.3;padding:36px;border-color:var(--accent)"><div class="lb a">해결</div><h3 style="margin-top:20px;font-size:40px">웹 체험판과 소개 페이지</h3>
+      <ul class="pts" style="margin-top:12px"><li>앱을 웹에서 체험해 볼 수 있는 소개 페이지</li><li>APK 다운로드 버튼 추가</li><li>평가 탭에서 테스터 평가를 수집</li></ul><a class="lnk" href="https://zlkdjkdj.github.io/26-2-AI-Project-/" target="_blank" rel="noopener" style="margin-top:24px">웹 체험판 열기<svg class="i"><use href="#arrow"/></svg></a><p style="font-size:22px;line-height:32px;margin-top:12px;color:var(--muted)">zlkdjkdj.github.io/26-2-AI-Project-</p></div>
+    <div style="display:grid;place-items:center;color:var(--accent);font-size:48px"><svg class="i"><use href="#arrow"/></svg></div>
+    <div class="card acc" data-a style="--i:4;flex:1;padding:36px"><div class="lb" style="background:rgba(255,255,255,.16);color:#fff">다음</div><h3 style="margin-top:20px;font-size:40px">평가 결과를 받아 개선</h3><p style="font-size:30px;margin-top:8px">테스터 평가를 모아 보완할 예정입니다</p></div>
+  </div>
+  <div class="foot"><span>웹 체험판은 사진 점검과 홈캠 화면을 브라우저에서 체험하는 시연용입니다.</span><span>앗차차 · 05 AI 활용</span></div>
+</section>
+
+<!-- 19. 느낀 점 -->
+<section class="slide" data-title="AI 활용 · 느낀 점">
+  <div class="tag" data-a><b>05</b>AI 활용 경험</div>
+  <h2 data-a style="--i:1">AI 사용 후 <em>느낀 점</em></h2>
+  <div style="display:flex;gap:24px;flex:1;margin:40px 0 64px">
+    <div class="card" data-a style="--i:2;flex:1;padding:40px;display:flex;flex-direction:column;gap:20px"><div class="ico a"><svg class="i"><use href="#phone"/></svg></div><h3 style="font-size:40px">에이전트가 폰을 직접 조작</h3><p style="font-size:30px">설치가 위험할 수 있다는 점은 알았지만, 휴대폰 개발자 모드와 디버그 모드를 켜자 에이전트가 <b>앱 설치, 개발, 디버깅</b>을 직접 수행하는 과정이 놀라웠습니다</p></div>
+    <div class="card" data-a style="--i:3;flex:1;padding:40px;display:flex;flex-direction:column;gap:20px"><div class="ico a"><svg class="i"><use href="#chip"/></svg></div><h3 style="font-size:40px">내 폰의 성능</h3><p style="font-size:30px">연락과 영상 시청 정도로만 쓰던 익숙한 스마트폰이 <b>로컬 AI 모델을 돌리고 높은 정확도를 낼 만큼</b> 좋다는 것이 신기했습니다</p></div>
+    <div class="card acc" data-a style="--i:4;flex:1;padding:40px;display:flex;flex-direction:column;gap:20px"><div class="ico"><svg class="i"><use href="#star"/></svg></div><h3 style="font-size:40px">개발자 역할의 확장</h3><p style="font-size:30px">기획, 개발, 발표를 거치며 사업성 있는 앱·웹 서비스를 만드는 일이 어렵다는 것을 느꼈습니다. AI로 개발이 쉬워질수록 <b>PM과 마케팅까지 이해하는 개발자</b>가 경쟁력 있다고 생각합니다</p></div>
+  </div>
+</section>
+
+<!-- 15. 시연 영상 -->
+<section class="slide dark vidslide" data-title="시연 영상">
+  <div class="vph"><img class="print-only" src="assets/demo-poster.jpg" alt="시연 영상 첫 장면" style="height:1000px;width:auto;border-radius:64px;display:none"><video id="demo" src="assets/demo.mp4" poster="assets/demo-poster.jpg" controls playsinline muted loop preload="auto"></video></div>
+  <div class="side">
+    <div class="tag" data-a style="--i:1"><b>06</b>시연 영상</div>
+    <h2 data-a style="--i:2">직접<br><em>보세요</em></h2>
+    <p data-a style="--i:3">홈캠 연결부터 위험 가구 탐지까지 (약 49초)</p>
+    <button class="vbtn" id="vfs" data-a style="--i:4"><svg class="i"><use href="#expand"/></svg>영상 전체화면</button>
+    <p data-a class="screen-only" style="--i:5;font-size:22px;line-height:32px;color:var(--muted)">Space 재생·정지 · V 영상 전체화면</p>
+    <p class="print-only" style="display:none;font-size:26px;line-height:38px;color:var(--ink)">PDF에서는 영상이 재생되지 않습니다.<br>함께 제출한 <b>앗차차_시연영상_편집본.mp4</b> 또는<br>HTML 발표자료에서 확인해 주세요.</p>
+  </div>
+</section>
+
+<!-- 16. 정리 -->
+<section class="slide" data-title="한계와 향후 계획">
+  <div class="tag" data-a>정리</div>
+  <h2 data-a style="--i:1">구현, 실험, 앞으로</h2>
+  <div style="display:flex;gap:24px;flex:1;margin:40px 0 64px">
+    <div class="card" data-a style="--i:2;flex:1;padding:40px"><div class="ico a"><svg class="i"><use href="#check"/></svg></div><h3 style="margin-top:32px;font-size:44px">구현됨</h3>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;align-items:flex-start"><span class="chip p"><i></i>사진 안전점검</span><span class="chip p"><i></i>QR 등록 공기계 홈캠</span><span class="chip p"><i></i>사람 위치 표시 · 수동 녹화</span></div></div>
+    <div class="card" data-a style="--i:3;flex:1;padding:40px"><div class="ico a"><svg class="i"><use href="#bolt"/></svg></div><h3 style="margin-top:32px;font-size:44px">실험 기능</h3>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;align-items:flex-start"><span class="chip w"><i></i>낙상 의심 기록</span><span class="chip w"><i></i>오탐·누락 가능</span><span class="chip w"><i></i>자동 신고·푸시 없음</span></div></div>
+    <div class="card acc" data-a style="--i:4;flex:1;padding:40px"><div class="ico"><svg class="i"><use href="#star"/></svg></div><h3 style="margin-top:32px;font-size:44px">앞으로</h3>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;align-items:flex-start"><span class="chip" style="color:#171717"><i></i>정밀도·재현율 측정</span><span class="chip" style="color:#171717"><i></i>보안·라이선스 점검</span></div></div>
+  </div>
+</section>
+
+<!-- 17. 끝 -->
+<section class="slide dark" data-title="감사합니다" style="align-items:center;justify-content:center;text-align:center">
+  <div class="tag" data-a style="justify-content:center">앗차차</div>
+  <h1 data-a style="--i:1;font-size:176px;margin-top:16px">감사합니다</h1>
+  <p data-a style="--i:2;font-size:40px;margin-top:32px">집 안 구석구석, 하루하루 안심하게</p>
+  <a class="lnk" data-a style="--i:3;margin-top:48px" href="https://zlkdjkdj.github.io/26-2-AI-Project-/" target="_blank" rel="noopener">웹 체험판 · zlkdjkdj.github.io/26-2-AI-Project-<svg class="i"><use href="#arrow"/></svg></a>
+  <div class="foot" style="justify-content:center"><span>디자인 정리: unslop by Damir Sokolovsky (@heydamir), CC BY 4.0</span></div>
+</section>
+
+<div id="curtain"></div>
+</div></div>
+
+<div id="hud"><button id="prev" aria-label="이전">◀</button><span id="pg">1 / 1</span><button id="next" aria-label="다음">▶</button><button id="fs" aria-label="전체화면">⛶</button></div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const bar = document.getElementById('bar'), pg = document.getElementById('pg');
+  const vid = document.getElementById('demo');
+  let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+
+  function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `translate(-50%,-50%) scale(${s})`; }
+
+  // 숫자 카운트업: 타이머 기반(requestAnimationFrame에 의존하지 않아 어떤 환경에서도 마지막 값에 도달)
+  function countUp(root) {
+    root.querySelectorAll('.cnt').forEach(el => {
+      const to = parseFloat(el.dataset.to), dec = parseInt(el.dataset.dec || 0, 10);
+      const dur = parseInt(el.dataset.dur || 1400, 10), delay = parseInt(el.dataset.delay || 300, 10);
+      clearInterval(el._t); clearTimeout(el._d);
+      el.textContent = (0).toFixed(dec);
+      el._d = setTimeout(() => {
+        const t0 = Date.now();
+        el._t = setInterval(() => {
+          const p = Math.min(1, (Date.now() - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+          el.textContent = (to * e).toFixed(dec);
+          if (p >= 1) clearInterval(el._t);
+        }, 30);
+      }, delay);
+    });
+  }
+
+  function apply(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((el, k) => el.classList.toggle('active', k === i));
+    pg.textContent = `${i + 1} / ${slides.length}`;
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+    document.title = `앗차차 발표자료 · ${slides[i].dataset.title || ''}`;
+    countUp(slides[i]);
+    if (slides[i].contains(vid)) { if (vid.currentTime > 0.1) vid.currentTime = 0; vid.play().catch(() => {}); } else vid.pause();
+  }
+  const curtain = document.getElementById('curtain'); let busy = false, target = i, tm = 0, tm2 = 0;
+  function show(n, instant) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    if (n === target && !instant) return;
+    target = n;
+    if (instant || busy) { clearTimeout(tm); apply(n); return; }
+    busy = true; const back = n < i;
+    curtain.className = ''; void curtain.offsetWidth; curtain.className = 'go' + (back ? ' back' : '');
+    tm = setTimeout(() => apply(target), 380);
+    tm2 = setTimeout(() => { busy = false; curtain.className = ''; }, 800);
+  }
+  function vFs() { (vid.requestFullscreen || vid.webkitRequestFullscreen).call(vid); }
+  function toggleFs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+
+  addEventListener('resize', fit);
+  addEventListener('hashchange', () => { const n = (parseInt(location.hash.slice(1), 10) || 1) - 1; if (n !== target) show(n, true); });
+  addEventListener('keydown', e => {
+    const onVid = slides[i].contains(vid);
+    if (e.target === vid && e.key === ' ') return;
+    if (['ArrowRight', 'PageDown', 'Enter'].includes(e.key)) show(target + 1);
+    else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) show(target - 1);
+    else if (e.key === 'Home') show(0); else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key === ' ') { if (onVid) { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); } else show(target + 1); }
+    else if (e.key.toLowerCase() === 'f') toggleFs();
+    else if (e.key.toLowerCase() === 'v' && onVid) vFs();
+  });
+  document.getElementById('prev').onclick = () => show(target - 1);
+  document.getElementById('next').onclick = () => show(target + 1);
+  document.getElementById('fs').onclick = toggleFs;
+  document.getElementById('vfs').onclick = vFs;
+  let t; const wake = () => { document.body.classList.remove('idle'); clearTimeout(t); t = setTimeout(() => document.body.classList.add('idle'), 2500); };
+  addEventListener('mousemove', wake); wake();
+  // 글자 리빌: 제목을 단어·글자로 쪼갬
+  document.querySelectorAll('.slide h1, .slide h2').forEach(h => {
+    let c = 0;
+    const walk = node => [...node.childNodes].forEach(n => {
+      if (n.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        n.textContent.split(/(\s+)/).forEach(tok => {
+          if (!tok) return;
+          if (/^\s+$/.test(tok)) { frag.appendChild(document.createTextNode(' ')); return; }
+          const w = document.createElement('span'); w.className = 'w';
+          [...tok].forEach(chr => { const sp = document.createElement('span'); sp.className = 'ch'; sp.style.setProperty('--c', c++); sp.textContent = chr; w.appendChild(sp); });
+          frag.appendChild(w);
+        });
+        n.replaceWith(frag);
+      } else if (n.nodeType === 1 && n.tagName !== 'BR') walk(n);
+    });
+    walk(h);
+  });
+  // 가로 배치된 요소는 왼쪽·가운데·오른쪽에서 다르게 등장
+  document.querySelectorAll('.slide [data-a]').forEach(el => {
+    if (el.dataset.a) return;
+    const p = el.parentElement, cs = getComputedStyle(p);
+    const sibs = [...p.children].filter(x => x.hasAttribute('data-a') && !x.dataset.a);
+    if (cs.display === 'flex' && cs.flexDirection === 'row' && sibs.length >= 2) {
+      const k = sibs.indexOf(el); el.dataset.a = k === 0 ? 'l' : k === sibs.length - 1 ? 'r' : 'z';
+    }
+  });
+  // 마우스 틸트
+  document.querySelectorAll('.phone, .photo, .card.tilt').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      el.style.transform = `perspective(1200px) rotateY(${x * 6}deg) rotateX(${-y * 6}deg)`;
+    });
+    el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+  });
+  fit(); show(i, true);
+})();
+</script>
+</body>
+</html>
