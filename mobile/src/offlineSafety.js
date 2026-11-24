@@ -89,7 +89,7 @@ export function offlineResult(detections,target,room,electrical=false,general=fa
  const scorable=hazards.filter(h=>h.risk_level!=='CHECK');
  const high=scorable.filter(h=>h.risk_level==='HIGH').length;
  const score=scorable.length?Math.max(0,Math.min(high>=2?40:high?60:80,100-scorable.reduce((sum,h)=>sum+levels[h.risk_level],0))):null;
- return {scan_id:`local-${Date.now()}`,hazards,detected_objects:detections,safety_score:score,score_computable:!!scorable.length,explanation_pending:false,notice:actualRoom?(electrical?'추가 모델로 선풍기·의자·책상·테이블도 교차 확인합니다. 전선·멀티탭·플러그와 물건은 빠지거나 잘못 탐지될 수 있으니 실제 종류와 위험 상태를 직접 확인하세요.':'가구 모서리가 탐지되지 않을 수 있으니 직접 확인하세요. 휴대폰 내 가구·일반 물건 점검입니다. 전선·콘센트·멀티탭·플러그는 탐지하지 못하므로 직접 확인하세요.'):'공간을 자동 판별하지 못해 점수를 산정하지 않았습니다. 공간을 직접 선택해 다시 점검하세요.'};
+ return {scan_id:`local-${Date.now()}`,hazards,detected_objects:detections,safety_score:score,score_computable:!!scorable.length,explanation_pending:false,notice:actualRoom?(electrical?'추가 모델로 전선·콘센트·멀티탭·플러그·바닥(물기, 러그)·선풍기를 확인합니다. 후보가 빠지거나 잘못 탐지될 수 있으니 실제 종류와 위험 상태를 직접 확인하세요.':'가구 모서리가 탐지되지 않을 수 있으니 직접 확인하세요. 휴대폰 내 가구·일반 물건 점검입니다. 전선·콘센트·멀티탭·플러그는 탐지하지 못하므로 직접 확인하세요.'):'공간을 자동 판별하지 못해 점수를 산정하지 않았습니다. 공간을 직접 선택해 다시 점검하세요.'};
 }
 
 // 공통 규칙만 사용하며 사용자나 공간을 추정하지 않습니다.

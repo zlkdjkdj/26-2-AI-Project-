@@ -65,7 +65,13 @@ class HomecamBridgeModule : Module() {
     AsyncFunction("offlineModelReady") { OfflinePhotoDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("downloadOfflineModel") { OfflinePhotoDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
     AsyncFunction("removeOfflineModel") { OfflinePhotoDetector.remove(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }
-    AsyncFunction("detectOfflinePhoto") { uri: String -> OfflinePhotoDetector.detect(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다."), uri) }.runOnQueue(photoScope)
+    AsyncFunction("detectOfflinePhoto") { uri: String ->
+      val context = appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")
+      val general = OfflinePhotoDetector.detect(context, uri)
+      // 콘센트·멀티탭은 직접 학습한 전용 모델로 찾는다. 이 모델이 실패해도 기본 결과는 그대로 돌려준다.
+      val outlets = try { OfflineOutletDetector.detect(context, uri) } catch (error: Throwable) { android.util.Log.w("Atchacha", "outlet detector failed", error); emptyList() }
+      general + outlets
+    }.runOnQueue(photoScope)
     AsyncFunction("electricalModelSupported") { OfflineElectricalDetector.supported(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("electricalModelReady") { OfflineElectricalDetector.ready(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")) }
     AsyncFunction("downloadElectricalModel") { OfflineElectricalDetector.download(appContext.reactContext ?: throw IllegalStateException("앱을 준비하지 못했습니다.")); true }

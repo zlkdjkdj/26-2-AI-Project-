@@ -204,7 +204,7 @@ export default function PhotoScan({ onBack }) {
                   <Button secondary title="가구 모델 삭제" onPress={removeModel} disabled={busy} />
                   <Text style={s.heading}>전기·바닥 위험과 물건 종류 추가 확인</Text>
                   {electricalSupported === false ? <Text style={s.note}>이 휴대폰은 추가 점검 모델을 실행하기에 메모리가 부족합니다. 물건 종류와 전기설비는 직접 확인해 주세요.</Text> : electricalReady ? <>
-                    <Text style={s.note}>{includeElectrical ? "전기설비·물기·매트와 선풍기·의자·책상·테이블 후보를 추가 모델로 확인합니다. 분석에 더 오래 걸릴 수 있습니다." : "현재 기본 가구 모델만 사용합니다. 추가 물건 분류와 전기설비는 확인되지 않습니다."}</Text>
+                    <Text style={s.note}>{includeElectrical ? "전기설비·물기·매트와 선풍기 후보를 추가 모델로 확인합니다. 분석에 더 오래 걸릴 수 있습니다." : "현재 기본 가구 모델만 사용합니다. 추가 물건 분류와 전기설비는 확인되지 않습니다."}</Text>
                     <Button secondary title={includeElectrical ? "추가 점검 끄기" : "추가 점검 켜기"} onPress={() => setIncludeElectrical(!includeElectrical)} disabled={busy} />
                     <Button secondary title="전기 모델 삭제" onPress={removeElectrical} disabled={busy} />
                   </> : <>
