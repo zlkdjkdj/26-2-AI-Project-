@@ -16,7 +16,8 @@ import { colors as c, fonts as f } from "./ui";
 import { Enter, PageHeader, Progress, Notice } from "./appUi";
 import { useReducedMotion } from "./introMotion";
 import Bridge from "../modules/homecam-bridge";
-import { generalOfflineResult } from "./offlineSafety";
+import { offlineResult } from "./offlineSafety";
+import rules from "./offlineRules";
 import { reconcileFurniture } from "./furnitureReconciliation";
 import { runPhotoAnalysis } from "./photoAnalysis";
 import ZoomPhoto from "./ZoomPhoto";
@@ -44,6 +45,35 @@ function Button({ title, onPress, disabled, secondary }) {
   );
 }
 
+const targetChoices = Object.entries(rules.targetLabels);
+const roomChoices = Object.entries(rules.spaceLabels);
+function computeResult(detections, electrical, target, room) {
+  const general = target === "elderly" && room === "living_room";
+  return offlineResult(detections, target, room, electrical, general);
+}
+
+function ChoiceRow({ title, choices, value, onChange, disabled }) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={s.label}>{title}</Text>
+      <View style={s.row}>
+        {choices.map(([key, label]) => (
+          <Pressable
+            key={key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: value === key, disabled: !!disabled }}
+            disabled={disabled}
+            onPress={() => onChange(key)}
+            style={[s.choice, value === key && s.choiceOn, disabled && { opacity: 0.45 }]}
+          >
+            <Text style={[s.choiceText, value === key && { color: "#fff" }]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function PhotoScan({ onBack }) {
   const scroll = useRef(null);
   const recommendationY = useRef(0);
@@ -57,6 +87,10 @@ export default function PhotoScan({ onBack }) {
   const [includeElectrical, setIncludeElectrical] = useState(true);
   const [electricalSupported, setElectricalSupported] = useState(null);
   const [photo, setPhoto] = useState(null);
+  // 점검 대상·공간. 기본값(노약자·거실)이면 예전처럼 대상 표현 없는 공통 문구를 쓴다.
+  const [target, setTarget] = useState("elderly");
+  const [room, setRoom] = useState("living_room");
+  const lastDetections = useRef(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,6 +154,15 @@ export default function PhotoScan({ onBack }) {
       setError(e.message);
     }
   }
+  function changeSelection(nextTarget, nextRoom) {
+    setTarget(nextTarget);
+    setRoom(nextRoom);
+    const last = lastDetections.current;
+    if (last && result && !result.preliminary && !busy) {
+      setSelectedHazard(0);
+      setResult({ ...computeResult(last.detections, last.extraUsed, nextTarget, nextRoom), extraError: last.extraError, elapsed_ms: last.elapsed_ms });
+    }
+  }
   async function analyze() {
     if (!photo || busy) return;
     setSelectedHazard(0);
@@ -132,12 +175,14 @@ export default function PhotoScan({ onBack }) {
       const parallel = useElectrical && await Bridge.photoParallelSupported().catch(() => false);
       const outcome = await runPhotoAnalysis({ bridge: Bridge, uri: photo.uri, useExtra: useElectrical, parallel,
         onPartial: local => {
-          if (alive.current) setResult({ ...generalOfflineResult(local, false), preliminary: true, explanation_pending: true, elapsed_ms: Date.now() - started });
+          if (alive.current) setResult({ ...computeResult(local, false, target, room), preliminary: true, explanation_pending: true, elapsed_ms: Date.now() - started });
         },
       });
       if (alive.current) {
         setSelectedHazard(0); setShowAllBoxes(true);
-        setResult({ ...generalOfflineResult(reconcileFurniture(outcome.detections), outcome.extraUsed), extraError: outcome.extraError, elapsed_ms: Date.now() - started });
+        const finalDetections = reconcileFurniture(outcome.detections);
+        lastDetections.current = { detections: finalDetections, extraUsed: outcome.extraUsed, extraError: outcome.extraError, elapsed_ms: Date.now() - started };
+        setResult({ ...computeResult(finalDetections, outcome.extraUsed, target, room), extraError: outcome.extraError, elapsed_ms: Date.now() - started });
       }
     } catch (e) {
       if (alive.current) setError(e.message);
@@ -236,6 +281,12 @@ export default function PhotoScan({ onBack }) {
                     disabled={busy}
                   />
                 </View>
+              </View>
+              <View style={s.card}>
+                <Text style={s.heading}>점검 기준</Text>
+                <ChoiceRow title="누구를 위한 점검인가요" choices={targetChoices} value={target} onChange={(v) => changeSelection(v, room)} disabled={busy} />
+                <ChoiceRow title="어느 공간인가요" choices={roomChoices} value={room} onChange={(v) => changeSelection(target, v)} disabled={busy} />
+                <Text style={s.note}>대상과 공간에 따라 위험 등급 기준(규칙표)이 달라집니다. 선택하지 않으면 노약자·거실 기준입니다.</Text>
               </View>
               <View style={s.card}>
                 <Button
@@ -487,6 +538,9 @@ const s = StyleSheet.create({
     fontFamily: f.regular,
   },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  choice: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface },
+  choiceOn: { backgroundColor: c.accent, borderColor: c.accent },
+  choiceText: { fontFamily: f.medium, fontSize: 14, color: c.ink },
   button: {
     backgroundColor: c.accent,
     minHeight: 48,
