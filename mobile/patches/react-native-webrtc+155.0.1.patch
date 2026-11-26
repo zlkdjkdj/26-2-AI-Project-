@@ -30,3 +30,90 @@ index 01d31d7..f30221c 100644
      public boolean enableMediaProjectionService;
  
      public static WebRTCModuleOptions getInstance() {
+diff --git a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCView.java b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCView.java
+index 0000000..0000000 100644
+--- a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCView.java
++++ b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/WebRTCView.java
+@@ -24,6 +24,8 @@
+ import org.webrtc.RendererCommon.RendererEvents;
+ import org.webrtc.RendererCommon.ScalingType;
+ import org.webrtc.SurfaceViewRenderer;
++import org.webrtc.VideoFrame;
++import org.webrtc.VideoSink;
+ import org.webrtc.VideoTrack;
+ 
+ import java.lang.reflect.InvocationTargetException;
+@@ -153,6 +155,31 @@
+      * The callback to be called when video dimensions change.
+      */
+     private boolean onDimensionsChangeEnabled = false;
++
++    /**
++     * atchacha: extra clockwise rotation applied to every rendered frame.
++     * A SurfaceView ignores View transforms, so rotating the parent stretches
++     * the picture. Rotating the frame itself keeps layout and aspect correct.
++     */
++    private volatile int extraRotation = 0;
++
++    private final VideoSink rotatingSink = new VideoSink() {
++        @Override
++        public void onFrame(VideoFrame frame) {
++            int extra = extraRotation;
++            if (extra == 0) {
++                surfaceViewRenderer.onFrame(frame);
++                return;
++            }
++            VideoFrame rotated = new VideoFrame(
++                    frame.getBuffer(), (frame.getRotation() + extra) % 360, frame.getTimestampNs());
++            surfaceViewRenderer.onFrame(rotated);
++        }
++    };
++
++    public void setVideoRotation(int rotation) {
++        extraRotation = ((rotation % 360) + 360) % 360;
++    }
+ 
+     public WebRTCView(Context context) {
+         super(context);
+@@ -301,6 +328,7 @@
+                         WritableMap params = Arguments.createMap();
+                         params.putInt("width", videoWidth);
+                         params.putInt("height", videoHeight);
++                        params.putInt("rotation", rotation);
+ 
+                         // Send the event through React Native's event system
+                         reactContext.getJSModule(RCTEventEmitter.class)
+@@ -378,7 +406,7 @@
+             if (videoTrack != null) {
+                 ThreadUtils.runOnExecutor(() -> {
+                     try {
+-                        videoTrack.removeSink(surfaceViewRenderer);
++                        videoTrack.removeSink(rotatingSink);
+                     } catch (Throwable tr) {
+                         // XXX If WebRTCModule#mediaStreamTrackRelease has already been
+                         // invoked on videoTrack, then it is no longer safe to call removeSink
+@@ -586,7 +614,7 @@
+ 
+             ThreadUtils.runOnExecutor(() -> {
+                 try {
+-                    videoTrack.addSink(surfaceViewRenderer);
++                    videoTrack.addSink(rotatingSink);
+                 } catch (Throwable tr) {
+                     // XXX If WebRTCModule#mediaStreamTrackRelease has already been
+                     // invoked on videoTrack, then it is no longer safe to call addSink
+diff --git a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/RTCVideoViewManager.java b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/RTCVideoViewManager.java
+index 0000000..0000000 100644
+--- a/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/RTCVideoViewManager.java
++++ b/node_modules/react-native-webrtc/android/src/main/java/com/oney/WebRTCModule/RTCVideoViewManager.java
+@@ -51,6 +51,11 @@
+      * {@code objectFit} property of the JavaScript counterpart of
+      * {@code WebRTCView} i.e. {@code RTCView}.
+      */
++    @ReactProp(name = "videoRotation")
++    public void setVideoRotation(WebRTCView view, int rotation) {
++        view.setVideoRotation(rotation);
++    }
++
+     @ReactProp(name = "objectFit")
+     public void setObjectFit(WebRTCView view, String objectFit) {
+         view.setObjectFit(objectFit);

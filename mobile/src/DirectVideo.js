@@ -14,7 +14,11 @@ import {
   tailnetSdp,
 } from "./directProtocol";
 import { excludeUnsupportedAv1 } from "./videoCodecs";
+import { stripVideoOrientation } from "./sdpOrientation";
+import { addBitrateHints, tuneVideoSender } from "./videoQuality";
 import { mapPersonBox } from "./personBoxGeometry";
+import { containBox } from "./videoFit";
+import { IS_TABLET } from "./variant";
 import { advancePersonTrack } from "./personTracking";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +68,8 @@ const DirectVideo = forwardRef(function DirectVideo({
   const [message, setMessage] = useState("영상 준비 중…");
   const [person, setPerson] = useState(null);
   const [viewport, setViewport] = useState(null);
+  // 영상 크기·회전(상대 기기를 가로·세로로 돌리면 바뀜). 원본 비율 표시는 이 값으로 직접 계산한다.
+  const [frame, setFrame] = useState(null);
   const [detectionMessage, setDetectionMessage] = useState("");
   const [fallMessage, setFallMessage] = useState("");
   const trackRef = useRef(null);
@@ -71,13 +77,19 @@ const DirectVideo = forwardRef(function DirectVideo({
   const switchingCamera = useRef(false);
   const [frontCamera, setFrontCamera] = useState(false);
   useImperativeHandle(ref, () => ({
+    /** 화면에 그려지는 영상 크기(회전 반영). PIP 창 비율을 맞출 때 쓴다. */
+    displaySize() {
+      if (!frame) return null;
+      const sideways = Math.abs(frame.turn) % 180 !== 0;
+      return sideways ? { width: frame.height, height: frame.width } : { width: frame.width, height: frame.height };
+    },
     async startRecording() {
       if (camera || !stream) throw new Error("영상 연결 후 녹화할 수 있습니다.");
       await queueManual(() => Bridge.startManualRecorder(stream.toURL()));
     },
     stopRecording() { Bridge.finishManualRecording(); },
     recordingStatus() { return Bridge.manualRecorderStatus(); },
-  }), [camera, stream]);
+  }), [camera, stream, frame]);
   useEffect(() => {
     if (camera || !stream) return;
     return () => { queueManual(() => Bridge.stopManualRecorder()).catch(() => {}); };
@@ -201,6 +213,7 @@ const DirectVideo = forwardRef(function DirectVideo({
           await current.setRemoteDescription({ type: "offer", sdp: offer.sdp });
           excludeUnsupportedAv1(current);
           await current.setLocalDescription(await current.createAnswer());
+          tuneVideoSender(current).catch(() => {});
           const sdp = await description(current);
           if (active && current === peer) Bridge.setAnswer(offer.id, sdp);
         }
@@ -272,7 +285,9 @@ const DirectVideo = forwardRef(function DirectVideo({
           media = event.streams[0] || new MediaStream([event.track]);
           setStream(media);
         });
-        await current.setLocalDescription(await current.createOffer());
+        const offer = await current.createOffer();
+        const offerSdp = addBitrateHints(IS_TABLET ? stripVideoOrientation(offer.sdp) : offer.sdp);
+        await current.setLocalDescription({ type: offer.type, sdp: offerSdp });
         const sdp = await description(current);
         if (!active || attempt !== generation) return;
         const result = await request("/v1/offer", { json: { sdp } });
@@ -337,18 +352,31 @@ const DirectVideo = forwardRef(function DirectVideo({
     left: (viewport.width - viewport.height) / 2, top: (viewport.height - viewport.width) / 2,
     transform: [{ rotate: `${rotation}deg` }],
   } : [StyleSheet.absoluteFill, { transform: [{ rotate: `${rotation}deg` }] }];
+  // 영상 회전은 영상 프레임 자체를 돌려서 그린다(videoRotation).
+  // 안드로이드의 영상 화면(SurfaceView)은 부모 View의 회전을 따르지 않아, 부모를 돌리면 영상이 늘어나 보였다.
+  const videoRotation = camera ? 0 : ((rotation % 360) + 360) % 360;
+  // 원본 비율(contain): 실제로 그려지는 영상 크기·회전(돌린 각도 포함)으로 화면비를 구해 그 상자에 영상을 꽉 채운다.
+  // PIP(compact)에서는 앱이 일시정지 상태라 화면 크기 변화가 JS로 늦게 전달된다. 이전 크기의 상자가 남으면
+  // 영상이 잘린 채 축소돼 보이므로, PIP에서는 창 전체를 채우게 둔다. PIP 창 비율을 영상 비율로 열기 때문에 잘리지 않는다.
+  const videoBox = !compact && fit === "contain" && frame && viewport ? containBox(frame, viewport) : null;
   return (
     <View style={styles.video} onLayout={(event) => setViewport(event.nativeEvent.layout)}>
-      <View style={rotatedStyle}>
       {stream && (
         <RTCView
+          onDimensionsChange={(event) => {
+            const { width, height, rotation: turn = 0 } = event.nativeEvent;
+            setFrame((old) => old && old.width === width && old.height === height && old.turn === turn ? old : { width, height, turn });
+          }}
           streamURL={stream.toURL()}
-          style={StyleSheet.absoluteFill}
-          objectFit={fit}
+          videoRotation={videoRotation}
+          style={videoBox || StyleSheet.absoluteFill}
+          objectFit={videoBox || compact ? "cover" : fit}
           mirror={camera && frontCamera}
         />
       )}
-      {!camera && stream && person && videoViewport && (() => {
+      {/* 사람 박스는 일반 View라 회전 변환이 그대로 적용된다. 영상과 같은 각도로 돌려 위치를 맞춘다. */}
+      <View pointerEvents="none" style={rotatedStyle}>
+      {!compact && !camera && stream && person && videoViewport && (() => {
         const bounds = mapPersonBox(person, { width: person.frameWidth, height: person.frameHeight }, videoViewport, fit);
         return bounds ? <View pointerEvents="none" style={[styles.personBox, bounds]}><Text style={styles.personLabel}>사람</Text></View> : null;
       })()}
@@ -368,7 +396,7 @@ const DirectVideo = forwardRef(function DirectVideo({
       {!compact && !camera && stream && !!detectionMessage && <Text pointerEvents="none" style={styles.detectionStatus}>{detectionMessage}</Text>}
       {camera && stream && fallRecording && <Text pointerEvents="none" style={styles.detectionStatus}>{fallMessage || "낙상 의심 감지 준비 중"}</Text>}
       {!compact && <View style={styles.status}>
-        <Text style={styles.text}>{message}</Text>
+        <Text style={styles.text}>{message}{IS_TABLET && frame ? ` · 영상 ${frame.width}x${frame.height} 회전 ${frame.turn} · 화면 ${Math.round(viewport?.width || 0)}x${Math.round(viewport?.height || 0)}` : ""}</Text>
       </View>}
     </View>
   );

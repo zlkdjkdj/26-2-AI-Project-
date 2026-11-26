@@ -3,13 +3,14 @@ import { Text } from "react-native";
 import { Camera, Monitor, QrCode, ShieldCheck } from "lucide-react-native";
 import { Button, s } from "../ui";
 import { Page, PageHeader, Progress, Section, Notice } from "../appUi";
+import { IS_TABLET } from "../variant";
 export default function HomeCamRoles() {
   return (
     <Page>
       <PageHeader
         onBack={() => router.back()}
         eyebrow="홈캠 · 역할 선택"
-        title="이 휴대폰은 어떤 역할인가요?"
+        title={IS_TABLET ? "이 태블릿은 어떤 역할인가요?" : "이 휴대폰은 어떤 역할인가요?"}
         description="집에 두는 공기계는 촬영용으로, 가지고 다니는 휴대폰은 모니터링용으로 선택하세요."
       />
       <Progress labels={["모드 선택", "기기 역할", "연결"]} current={1} />
@@ -48,11 +49,13 @@ export default function HomeCamRoles() {
         앱 홈캠은 PC 없이 연결됩니다. 촬영 기기에서 실험용 낙상 의심 영상
         기록을 선택할 수 있으며, 자동 신고·긴급 출동 기능은 제공하지 않습니다.
       </Text>
+      {!IS_TABLET && <>
       <Text style={s.section}>추가 기능</Text>
       <Text style={s.text}>사진을 촬영해 가구 주변을 점검할 수 있어요. 가구 모델은 필요한 경우 별도로 내려받습니다.</Text>
       <Button secondary icon={ShieldCheck} onPress={() => router.push("/photo")}>
         사진 안전점검 열기
       </Button>
+      </>}
     </Page>
   );
 }

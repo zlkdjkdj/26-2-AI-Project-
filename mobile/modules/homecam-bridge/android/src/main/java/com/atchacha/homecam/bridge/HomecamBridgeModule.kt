@@ -94,12 +94,24 @@ class HomecamBridgeModule : Module() {
     }
     Function("fallRecorderStatus") { fallRecorder?.status() ?: "감지 중지됨" }
     Function("isPictureInPicture") { Build.VERSION.SDK_INT >= 26 && (appContext.currentActivity ?: pipActivity?.get())?.isInPictureInPictureMode == true }
-    AsyncFunction("enterPictureInPicture") {
+    AsyncFunction("enterPictureInPicture") { width: Int?, height: Int? ->
       val activity = appContext.currentActivity ?: throw IllegalStateException("화면을 준비하지 못했습니다.")
       pipActivity = WeakReference(activity)
       if (Build.VERSION.SDK_INT < 26 || !activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE))
         throw IllegalStateException("이 기기에서는 PIP를 지원하지 않습니다.")
-      if (!activity.enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()))
+      // PIP 창을 영상 비율에 맞춘다(세로 영상이면 세로 창). 비율이 안 맞으면 영상이 잘린 채 축소돼 보인다.
+      // 안드로이드가 허용하는 범위(1:2.39 ~ 2.39:1) 밖이면 경계값으로 맞춘다.
+      val w = width ?: 16
+      val h = height ?: 9
+      val ratio = if (w <= 0 || h <= 0) Rational(16, 9) else {
+        val r = w.toDouble() / h.toDouble()
+        when {
+          r > 2.39 -> Rational(239, 100)
+          r < 1 / 2.39 -> Rational(100, 239)
+          else -> Rational(w, h)
+        }
+      }
+      if (!activity.enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(ratio).build()))
         throw IllegalStateException("PIP를 시작하지 못했습니다. 기기의 PIP 권한을 확인하세요.")
       true
     }.runOnQueue(Queues.MAIN)

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   useAnimatedValue,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -174,11 +175,14 @@ export function Progress({ labels, current }) {
   );
 }
 export function Player({ children, controls, note, compact = false }) {
+  // 가로 화면(태블릿)에서는 영상을 넓게 쓰고 버튼은 오른쪽 열에 둔다.
+  const { width, height } = useWindowDimensions();
+  const sideBySide = !compact && width > height;
   return (
-    <SafeAreaView style={a.player} edges={compact ? [] : undefined}>
+    <SafeAreaView style={[a.player, sideBySide && a.playerRow]} edges={compact ? [] : undefined}>
       <StatusBar style="light" />
       <View style={a.video}>{children}</View>
-      {!compact && <View style={a.controls}>
+      {!compact && <View style={[a.controls, sideBySide && a.controlsSide]}>
         {note && <Text style={a.playerNote}>{note}</Text>}
         {controls}
       </View>}
@@ -245,8 +249,10 @@ const a = StyleSheet.create({
   light: { color: "#fff" },
   lightMuted: { color: "#a1a1a6" },
   player: { flex: 1, backgroundColor: "#08080a" },
+  playerRow: { flexDirection: "row" },
   video: { flex: 1, overflow: "hidden" },
   controls: { backgroundColor: "#151518", padding: 16, gap: 12 },
+  controlsSide: { width: 320, justifyContent: "center" },
   playerNote: {
     fontFamily: f.regular,
     fontSize: 12,

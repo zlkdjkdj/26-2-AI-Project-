@@ -67,7 +67,8 @@ export default function ViewerScreen() {
     try {
       // Let the compact player render before Android snapshots the activity.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      await Bridge.enterPictureInPicture();
+      const size = videoRef.current?.displaySize?.();
+      await Bridge.enterPictureInPicture(size ? Math.round(size.width) : 16, size ? Math.round(size.height) : 9);
       setTimeout(() => { pipPending.current = false; }, 700);
     } catch (error) {
       pipPending.current = false;
